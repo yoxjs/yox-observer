@@ -291,11 +291,11 @@ export default class Observer {
     if (sync) {
       instance.dispatch()
     }
-    else if (!instance.$waiting) {
-      instance.$waiting = env.TRUE
+    else if (!instance.waiting) {
+      instance.waiting = env.TRUE
       nextTask.add(
         function () {
-          delete instance.$waiting
+          delete instance.waiting
           instance.dispatch()
         }
       )
