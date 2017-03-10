@@ -1,0 +1,24 @@
+{
+  "name": "yox-observer",
+  "version": "0.4.1",
+  "description": "Observer for Yox.js",
+  "main": "src/index.js",
+  "directories": {
+    "example": "example",
+    "test": "test"
+  },
+  "devDependencies": {
+    "yox-common": "^0.6.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoxjs/yox-observer.git"
+  },
+  "keywords": [],
+  "author": "musicode",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yoxjs/yox-observer/issues"
+  },
+  "homepage": "https://github.com/yoxjs/yox-observer#readme"
+}
