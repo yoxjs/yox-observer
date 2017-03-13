@@ -76,18 +76,18 @@ export default class Observer {
           if (get) {
 
             let watcher = function () {
-              getter.$dirty = env.TRUE
+              getter.dirty = env.TRUE
             }
 
             let getter = function () {
               let { computedCache } = instance
-              if (!getter.$dirty) {
+              if (!getter.dirty) {
                 if (cache && object.has(computedCache, keypath)) {
                   return computedCache[ keypath ]
                 }
               }
               else {
-                delete getter.$dirty
+                delete getter.dirty
               }
 
               if (!deps) {
@@ -411,7 +411,7 @@ export default class Observer {
 
     let instance = this
 
-    instance.$watchEmitter.off()
+    instance.emitter.off()
 
     object.each(
       instance,
