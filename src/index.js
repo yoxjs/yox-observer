@@ -161,7 +161,7 @@ export default class Observer {
 
         if (value) {
           value = value()
-          return rest && is.primitive(value)
+          return rest && !is.primitive(value)
             ? object.get(value, rest)
             : { value }
         }
