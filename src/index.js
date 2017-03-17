@@ -1,8 +1,9 @@
 
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
-import * as object from 'yox-common/util/object'
 import * as array from 'yox-common/util/array'
+import * as object from 'yox-common/util/object'
+import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
@@ -517,7 +518,7 @@ function matchKeypath(data, keypath) {
     function (prefix, index) {
       if (string.startsWith(keypath, prefix)) {
         value = data[ prefix ]
-        rest = string.slice(keypath, index)
+        rest = string.slice(keypath, prefix.length)
         return env.FALSE
       }
     }
