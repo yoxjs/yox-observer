@@ -244,62 +244,100 @@ export default class Observer {
     let {
       data,
       cache,
+      buffer,
       emitter,
       computedGetters,
       computedSetters,
     } = instance
 
-    object.each(
-      model,
-      function (newValue, keypath) {
+    let updateModel = function (model) {
+      object.each(
+        model,
+        function (newValue, keypath) {
 
-        // 格式化成内部处理的格式
-        keypath = keypathUtil.normalize(keypath)
+          // 格式化成内部处理的格式
+          keypath = keypathUtil.normalize(keypath)
 
-        // 如果监听了这个 keypath
-        // 就要确保有一份可对比的数据
-        if (emitter.has(keypath) && !object.has(cache, keypath)) {
-          cache[ keypath ] = instance.get(keypath)
-        }
-
-        // 如果有计算属性，则优先处理它
-        if (computedSetters) {
-          let setter = computedSetters[ keypath ]
-          if (setter) {
-            setter.call(instance, newValue)
-            return
+          // 如果监听了这个 keypath
+          // 就要确保有一份可对比的数据
+          if (emitter.has(keypath) && !object.has(cache, keypath)) {
+            cache[ keypath ] = instance.get(keypath)
           }
-          else {
-            let { value, rest } = matchKeypath(computedGetters, keypath)
-            if (value && rest) {
-              value = value()
-              if (!is.primitive(value)) {
-                object.set(value, rest, newValue)
-              }
+
+          // 如果有计算属性，则优先处理它
+          if (computedSetters) {
+            let setter = computedSetters[ keypath ]
+            if (setter) {
+              setter.call(instance, newValue)
               return
             }
+            else {
+              let { value, rest } = matchKeypath(computedGetters, keypath)
+              if (value && rest) {
+                value = value()
+                if (!is.primitive(value)) {
+                  object.set(value, rest, newValue)
+                }
+                return
+              }
+            }
           }
-        }
 
-        // 普通数据
-        object.set(data, keypath, newValue)
+          // 普通数据
+          object.set(data, keypath, newValue)
 
-      }
-    )
-
-    instance.dispatched = env.FALSE
-
-    if (sync) {
-      instance.dispatch()
-    }
-    else if (!instance.waiting) {
-      instance.waiting = env.TRUE
-      nextTask.add(
-        function () {
-          delete instance.waiting
-          instance.dispatch()
         }
       )
+    }
+
+    let dispatchSync = function () {
+      instance.dispatched = env.FALSE
+      instance.dispatch()
+    }
+
+    let dispatchAsync = function (callback) {
+      if (!instance.waiting) {
+        instance.waiting = env.TRUE
+        nextTask.add(
+          function () {
+            delete instance.waiting
+            callback && callback()
+            dispatchSync()
+          }
+        )
+      }
+    }
+
+    if (instance.dispatching) {
+      // dispatch 过程中的所有 set 操作都放入缓冲
+      // 在 nextTask 到来 或 当前 dispatch 结束之后清空 buffer
+      if (buffer) {
+        object.extend(buffer, model)
+      }
+      else {
+        instance.buffer = model
+      }
+      dispatchAsync(
+        function () {
+          if (instance.buffer) {
+            updateModel(instance.buffer)
+            delete instance.buffer
+          }
+        }
+      )
+    }
+    else {
+      if (buffer) {
+        model = object.extend(buffer, model)
+        delete instance.buffer
+      }
+      updateModel(model)
+      if (sync) {
+        dispatchSync()
+      }
+      else {
+        dispatchAsync()
+      }
     }
 
   }
@@ -366,17 +404,20 @@ export default class Observer {
       cache,
       emitter,
       context,
+      dispatching,
       dispatched,
       computedDeps,
       options,
     } = instance
 
-    // 避免无谓的对比，提升性能
-    if (dispatched) {
+    // 确保 dispatch 过程中不受干扰，能一次执行完
+    if (dispatching || dispatched) {
       return
     }
 
     execute(options.beforeDispatch, context)
+
+    instance.dispatching = env.TRUE
 
     let collection = [ ]
 
@@ -399,6 +440,7 @@ export default class Observer {
       }
     )
 
+    instance.dispatching = env.FALSE
     instance.dispatched = env.TRUE
 
     execute(options.afterDispatch, context)
