@@ -246,6 +246,7 @@ export default class Observer {
       cache,
       buffer,
       emitter,
+      context,
       computedGetters,
       computedSetters,
     } = instance
@@ -268,7 +269,7 @@ export default class Observer {
           if (computedSetters) {
             let setter = computedSetters[ keypath ]
             if (setter) {
-              setter.call(instance, newValue)
+              setter.call(context, newValue)
               return
             }
             else {
