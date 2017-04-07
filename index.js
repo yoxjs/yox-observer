@@ -177,7 +177,7 @@ export default class Observer {
 
     if (is.string(context)) {
       let prefixes = keypathUtil.parse(context)
-      if (suffixes.length > 1 && suffixes[ 0 ] === 'this') {
+      if (suffixes.length > 1 && suffixes[ 0 ] === env.THIS) {
         keypath = keypathUtil.stringify(
           array.merge(
             prefixes,
@@ -405,10 +405,10 @@ export default class Observer {
       cache,
       emitter,
       context,
+      options,
+      computedDeps,
       dispatching,
       dispatched,
-      computedDeps,
-      options,
     } = instance
 
     // 确保 dispatch 过程中不受干扰，能一次执行完
