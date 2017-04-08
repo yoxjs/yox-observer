@@ -76,18 +76,15 @@ export default class Observer {
           if (get) {
 
             let watcher = function () {
-              getter.dirty = env.TRUE
+              if (object.has(instance.computedCache, keypath)) {
+                delete instance.computedCache[ keypath ]
+              }
             }
 
             let getter = function () {
               let { computedCache } = instance
-              if (!getter.dirty) {
-                if (cache && object.has(computedCache, keypath)) {
-                  return computedCache[ keypath ]
-                }
-              }
-              else {
-                delete getter.dirty
+              if (cache && object.has(computedCache, keypath)) {
+                return computedCache[ keypath ]
               }
 
               if (!deps) {
