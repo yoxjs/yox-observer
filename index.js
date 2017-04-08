@@ -238,7 +238,6 @@ export default class Observer {
     let {
       data,
       cache,
-      buffer,
       emitter,
       context,
       computedGetters,
@@ -297,14 +296,16 @@ export default class Observer {
     this.emitter.off(keypath, watcher)
   }
 
+  /**
+   * 为一批 keypath 注册一个 watcher
+   */
   diff(newKeypaths, oldKeypaths, watcher) {
 
     if (newKeypaths !== oldKeypaths) {
 
-      let instance = this
+      let instance = this, collection = [ ]
       let { computedDeps } = instance
 
-      let collection = [ ]
       array.each(
         newKeypaths,
         function (keypath) {
@@ -343,16 +344,14 @@ export default class Observer {
    */
   dispatch() {
 
-    let instance = this
+    let instance = this, collection = [ ]
 
     let {
       cache,
-      emitter,
       context,
       computedDeps,
+      emitter,
     } = instance
-
-    let collection = [ ]
 
     object.each(
       cache,
@@ -379,18 +378,8 @@ export default class Observer {
    * 销毁
    */
   destroy() {
-
-    let instance = this
-
-    instance.emitter.off()
-
-    object.each(
-      instance,
-      function (value, key) {
-        delete instance[ key ]
-      }
-    )
-
+    this.emitter.off()
+    object.clear(this)
   }
 }
 
