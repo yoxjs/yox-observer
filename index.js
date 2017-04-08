@@ -34,7 +34,6 @@ export default class Observer {
     instance.cache = { }
     instance.emitter = new Emitter()
     instance.context = context || instance
-    instance.options = options
 
     // 计算属性也是数据
     if (is.object(computed)) {
@@ -172,7 +171,7 @@ export default class Observer {
 
     }
 
-    let result
+    let result, temp
     let suffixes = keypathUtil.parse(keypath)
 
     if (is.string(context)) {
@@ -188,7 +187,6 @@ export default class Observer {
       }
       else {
         keypath = env.NULL
-        let temp
         while (env.TRUE) {
           temp = keypathUtil.stringify(
             array.merge(
@@ -235,9 +233,8 @@ export default class Observer {
    * 更新数据
    *
    * @param {Object} model
-   * @param {?boolean} sync
    */
-  set(model, sync) {
+  set(model) {
 
     let instance = this
 
@@ -251,95 +248,45 @@ export default class Observer {
       computedSetters,
     } = instance
 
-    let updateModel = function (model) {
-      object.each(
-        model,
-        function (newValue, keypath) {
+    object.each(
+      model,
+      function (newValue, keypath) {
 
-          // 格式化成内部处理的格式
-          keypath = keypathUtil.normalize(keypath)
+        // 格式化成内部处理的格式
+        keypath = keypathUtil.normalize(keypath)
 
-          // 如果监听了这个 keypath
-          // 就要确保有一份可对比的数据
-          if (emitter.has(keypath) && !object.has(cache, keypath)) {
-            cache[ keypath ] = instance.get(keypath)
+        // 如果监听了这个 keypath
+        // 就要确保有一份可对比的数据
+        if (emitter.has(keypath) && !object.has(cache, keypath)) {
+          cache[ keypath ] = instance.get(keypath)
+        }
+
+        // 如果有计算属性，则优先处理它
+        if (computedSetters) {
+          let setter = computedSetters[ keypath ]
+          if (setter) {
+            setter.call(context, newValue)
+            return
           }
-
-          // 如果有计算属性，则优先处理它
-          if (computedSetters) {
-            let setter = computedSetters[ keypath ]
-            if (setter) {
-              setter.call(context, newValue)
+          else {
+            let { value, rest } = matchKeypath(computedGetters, keypath)
+            if (value && rest) {
+              value = value()
+              if (!is.primitive(value)) {
+                object.set(value, rest, newValue)
+              }
               return
             }
-            else {
-              let { value, rest } = matchKeypath(computedGetters, keypath)
-              if (value && rest) {
-                value = value()
-                if (!is.primitive(value)) {
-                  object.set(value, rest, newValue)
-                }
-                return
-              }
-            }
-          }
-
-          // 普通数据
-          object.set(data, keypath, newValue)
-
-        }
-      )
-    }
-
-    let dispatchSync = function () {
-      instance.dispatched = env.FALSE
-      instance.dispatch()
-    }
-
-    let dispatchAsync = function (callback) {
-      if (!instance.waiting) {
-        instance.waiting = env.TRUE
-        nextTask.add(
-          function () {
-            delete instance.waiting
-            callback && callback()
-            dispatchSync()
-          }
-        )
-      }
-    }
-
-    if (instance.dispatching) {
-      // dispatch 过程中的所有 set 操作都放入缓冲
-      // 在 nextTask 到来 或 当前 dispatch 结束之后清空 buffer
-      if (buffer) {
-        object.extend(buffer, model)
-      }
-      else {
-        instance.buffer = model
-      }
-      dispatchAsync(
-        function () {
-          if (instance.buffer) {
-            updateModel(instance.buffer)
-            delete instance.buffer
           }
         }
-      )
-    }
-    else {
-      if (buffer) {
-        model = object.extend(buffer, model)
-        delete instance.buffer
+
+        // 普通数据
+        object.set(data, keypath, newValue)
+
       }
-      updateModel(model)
-      if (sync) {
-        dispatchSync()
-      }
-      else {
-        dispatchAsync()
-      }
-    }
+    )
+
+    instance.dispatch()
 
   }
 
@@ -405,20 +352,8 @@ export default class Observer {
       cache,
       emitter,
       context,
-      options,
       computedDeps,
-      dispatching,
-      dispatched,
     } = instance
-
-    // 确保 dispatch 过程中不受干扰，能一次执行完
-    if (dispatching || dispatched) {
-      return
-    }
-
-    execute(options.beforeDispatch, context)
-
-    instance.dispatching = env.TRUE
 
     let collection = [ ]
 
@@ -440,11 +375,6 @@ export default class Observer {
         }
       }
     )
-
-    instance.dispatching = env.FALSE
-    instance.dispatched = env.TRUE
-
-    execute(options.afterDispatch, context)
 
   }
 
