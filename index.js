@@ -49,6 +49,14 @@ export default class Observer {
       // 计算属性的缓存
       instance.computedCache = { }
 
+      let {
+        computedCache,
+        computedStack,
+        computedDeps,
+        computedGetters,
+        computedSetters
+      } = instance
+
       object.each(
         computed,
         function (item, keypath) {
@@ -76,19 +84,18 @@ export default class Observer {
           if (get) {
 
             let watcher = function () {
-              if (object.has(instance.computedCache, keypath)) {
-                delete instance.computedCache[ keypath ]
+              if (object.has(computedCache, keypath)) {
+                delete computedCache[ keypath ]
               }
             }
 
             let getter = function () {
-              let { computedCache } = instance
               if (cache && object.has(computedCache, keypath)) {
                 return computedCache[ keypath ]
               }
 
               if (!deps) {
-                instance.computedStack.push([ ])
+                computedStack.push([ ])
               }
 
               let result = execute(get, instance.context)
@@ -96,21 +103,21 @@ export default class Observer {
                 computedCache[ keypath ] = result
               }
 
-              let newDeps = deps || instance.computedStack.pop()
-              let oldDeps = instance.computedDeps[ keypath ]
-              instance.computedDeps[ keypath ] = instance.diff(newDeps, oldDeps, watcher)
+              let newDeps = deps || array.pop(computedStack)
+              let oldDeps = computedDeps[ keypath ]
+              computedDeps[ keypath ] = instance.diff(newDeps, oldDeps, watcher)
 
               return result
 
             }
 
             getter.toString =
-            instance.computedGetters[ keypath ] = getter
+            computedGetters[ keypath ] = getter
 
           }
 
           if (set) {
-            instance.computedSetters[ keypath ] = set
+            computedSetters[ keypath ] = set
           }
 
         }
@@ -168,8 +175,7 @@ export default class Observer {
 
     }
 
-    let result, temp
-    let suffixes = keypathUtil.parse(keypath)
+    let suffixes = keypathUtil.parse(keypath), temp, result
 
     if (is.string(context)) {
       let prefixes = keypathUtil.parse(context)
@@ -204,7 +210,7 @@ export default class Observer {
               break
             }
             else {
-              prefixes.pop()
+              array.pop(prefixes)
             }
           }
         }
@@ -342,7 +348,7 @@ export default class Observer {
    */
   dispatch() {
 
-    let instance = this, collection = [ ]
+    let instance = this, collection = [ ], tasks = [ ]
 
     let {
       cache,
@@ -365,8 +371,22 @@ export default class Observer {
         let oldValue = cache[ keypath ]
         if (newValue !== oldValue) {
           cache[ keypath ] = newValue
-          emitter.fire(keypath, [ newValue, oldValue, keypath ], context)
+          // 先快照一份完整的变化清单
+          // 省的 watcher 包含设值逻辑，影响了当前快照的值
+          array.push(
+            tasks,
+            function () {
+              emitter.fire(keypath, [ newValue, oldValue, keypath ], context)
+            }
+          )
         }
+      }
+    )
+
+    array.each(
+      tasks,
+      function (task) {
+        task()
       }
     )
 
@@ -379,6 +399,7 @@ export default class Observer {
     this.emitter.off()
     object.clear(this)
   }
+
 }
 
 object.extend(
