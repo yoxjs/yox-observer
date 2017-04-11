@@ -348,7 +348,7 @@ export default class Observer {
    */
   dispatch() {
 
-    let instance = this, collection = [ ], tasks = [ ]
+    let instance = this, collection = [ ], differences = [ ]
 
     let {
       cache,
@@ -370,13 +370,13 @@ export default class Observer {
         let newValue = instance.get(keypath)
         let oldValue = cache[ keypath ]
         if (newValue !== oldValue) {
-          cache[ keypath ] = newValue
-          // 先快照一份完整的变化清单
-          // 省的 watcher 包含设值逻辑，影响了当前快照的值
+          saveToCache(cache, keypath, newValue)
           array.push(
-            tasks,
-            function () {
-              emitter.fire(keypath, [ newValue, oldValue, keypath ], context)
+            differences,
+            {
+              keypath,
+              oldValue,
+              newValue,
             }
           )
         }
@@ -384,11 +384,17 @@ export default class Observer {
     )
 
     array.each(
-      tasks,
-      function (task) {
-        task()
+      differences,
+      function (difference) {
+        emitter.fire(
+          difference.keypath,
+          [ difference.newValue, difference.oldValue, difference.keypath ],
+          context
+        )
       }
     )
+
+    return differences
 
   }
 
@@ -470,13 +476,22 @@ function createWatch(method) {
           }
         }
         if (!object.has(cache, keypath)) {
-          cache[ keypath ] = currentValue
+          saveToCache(cache, keypath, currentValue)
         }
       }
     )
 
   }
 
+}
+
+/**
+ * 保存到 cache 中，方便下次对比
+ */
+function saveToCache(cache, keypath, value) {
+  if (!string.has(keypath, '*')) {
+    cache[ keypath ] = value
+  }
 }
 
 /**
