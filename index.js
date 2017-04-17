@@ -7,6 +7,7 @@ import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
+import matchFirst from 'yox-common/function/matchFirst'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
@@ -31,8 +32,8 @@ export default class Observer {
     let instance = this
 
     instance.data = data
-    instance.cache = { }
     instance.emitter = new Emitter()
+    instance.families = { }
     instance.context = context || instance
 
     // 计算属性也是数据
@@ -160,13 +161,13 @@ export default class Observer {
 
       if (computedGetters) {
 
-        let { value, rest } = matchKeypath(computedGetters, keypath)
+        let { matched, rest } = matchKeypath(computedGetters, keypath)
 
-        if (value) {
-          value = value()
-          return rest && !is.primitive(value)
-            ? object.get(value, rest)
-            : { value }
+        if (matched) {
+          matched = matched()
+          return rest && !is.primitive(matched)
+            ? object.get(matched, rest)
+            : { value: matched }
         }
 
       }
@@ -239,28 +240,28 @@ export default class Observer {
    */
   set(model) {
 
-    let instance = this
+    let instance = this, differences = [ ]
 
     let {
       data,
-      cache,
       emitter,
       context,
       computedGetters,
       computedSetters,
     } = instance
 
+
     object.each(
       model,
-      function (newValue, keypath) {
+      function (newValue, keypath, oldValue) {
 
         // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
-        // 如果监听了这个 keypath
-        // 就要确保有一份可对比的数据
-        if (emitter.has(keypath) && !object.has(cache, keypath)) {
-          cache[ keypath ] = instance.get(keypath)
+        // 旧值，便于对比
+        oldValue = instance.get(keypath)
+        if (newValue !== oldValue) {
+          differences[ keypath ] = [ newValue, oldValue, keypath ]
         }
 
         // 如果有计算属性，则优先处理它
@@ -271,11 +272,11 @@ export default class Observer {
             return
           }
           else {
-            let { value, rest } = matchKeypath(computedGetters, keypath)
-            if (value && rest) {
-              value = value()
-              if (!is.primitive(value)) {
-                object.set(value, rest, newValue)
+            let { matched, rest } = matchKeypath(computedGetters, keypath)
+            if (matched && rest) {
+              matched = matched()
+              if (!is.primitive(matched)) {
+                object.set(matched, rest, newValue)
               }
               return
             }
@@ -288,16 +289,17 @@ export default class Observer {
       }
     )
 
-  }
+    object.each(
+      differences,
+      function (difference, keypath) {
+        emitter.fire(
+          keypath,
+          difference,
+          context
+        )
+      }
+    )
 
-  /**
-   * 取消监听数据变化
-   *
-   * @param {string|Object} keypath
-   * @param {?Function} watcher
-   */
-  unwatch(keypath, watcher) {
-    this.emitter.off(keypath, watcher)
   }
 
   /**
@@ -307,19 +309,11 @@ export default class Observer {
 
     if (newKeypaths !== oldKeypaths) {
 
-      let instance = this, collection = [ ]
-      let { computedDeps } = instance
-
-      array.each(
-        newKeypaths,
-        function (keypath) {
-          collectDeps(collection, keypath, computedDeps)
-        }
-      )
+      let instance = this
 
       oldKeypaths = oldKeypaths || [ ]
       array.each(
-        collection,
+        newKeypaths,
         function (keypath) {
           if (!array.has(oldKeypaths, keypath)) {
             instance.watch(keypath, watcher)
@@ -329,60 +323,15 @@ export default class Observer {
       array.each(
         oldKeypaths,
         function (keypath) {
-          if (!array.has(collection, keypath)) {
+          if (!array.has(newKeypaths, keypath)) {
             instance.unwatch(keypath, watcher)
           }
         }
       )
 
-      newKeypaths = collection
-
     }
 
     return newKeypaths
-
-  }
-
-  /**
-   * 清空当前存在的不同新旧值
-   */
-  dispatch() {
-
-    let instance = this, collection = [ ]
-
-    let {
-      cache,
-      context,
-      computedDeps,
-      emitter,
-    } = instance
-
-    object.each(
-      cache,
-      function (value, keypath) {
-        collectDeps(collection, keypath, computedDeps)
-      }
-    )
-
-    array.each(
-      collection,
-      function (keypath) {
-        let newValue = instance.get(keypath)
-        let oldValue = cache[ keypath ]
-        if (newValue !== oldValue) {
-          saveToCache(cache, keypath, newValue)
-          // 如果有 a 和 b 两个字段
-          // a 是计算属性，b 是 a 的依赖
-          // 当 b 变化了，a 需要及时被通知
-          // 否则上一步的 newValue 取不到正确的值
-          emitter.fire(
-            keypath,
-            [ newValue, oldValue, keypath ],
-            context
-          )
-        }
-      }
-    )
 
   }
 
@@ -407,7 +356,11 @@ object.extend(
      * @param {?Function} watcher
      * @param {?boolean} sync
      */
-    watch: createWatch('on'),
+    watch: createWatch(
+      function (instance, family, emitter) {
+        family.execute(emitter, 'on')
+      }
+    ),
 
     /**
      * 监听一次数据变化
@@ -416,7 +369,41 @@ object.extend(
      * @param {?Function} watcher
      * @param {?boolean} sync
      */
-    watchOnce: createWatch('once')
+    watchOnce: createWatch(
+      function (instance, family, emitter) {
+        family.watcher.$magic = function () {
+          instance.unwatch(family.keypath, family.watcher)
+        }
+        family.execute(emitter, 'on')
+      }
+    ),
+
+    /**
+     * 取消监听数据变化
+     *
+     * @param {string|Object} keypath
+     * @param {?Function} watcher
+     */
+    unwatch: function (keypath, watcher) {
+      let { emitter, families } = this
+      object.each(
+        families,
+        function (list, key) {
+          if (key === keypath) {
+            array.each(
+              list,
+              function (family, index) {
+                if (family.watcher === watcher) {
+                  family.execute(emitter, 'off')
+                  list.splice(index, 1)
+                }
+              },
+              env.TRUE
+            )
+          }
+        }
+      )
+    }
 
   }
 )
@@ -425,7 +412,7 @@ object.extend(
  * watch 和 watchOnce 逻辑相同
  * 提出一个工厂方法
  */
-function createWatch(method) {
+function createWatch(action) {
 
   return function (keypath, watcher, sync) {
 
@@ -441,31 +428,73 @@ function createWatch(method) {
     let instance = this
 
     let {
-      cache,
       emitter,
+      families,
       context,
+      computedDeps,
     } = instance
+
+    let collect = function (keypath, filter, deps) {
+
+      if (!deps) {
+        deps = [ ]
+      }
+
+      // 排序，把依赖最少的放前面
+      let addDep = function (keypath, push) {
+        if (keypath !== filter && !array.has(deps, keypath)) {
+          if (push) {
+            array.push(deps, keypath)
+          }
+          else {
+            array.unshift(deps, keypath)
+          }
+        }
+      }
+
+      if (computedDeps && !array.falsy(computedDeps[ keypath ])) {
+        array.each(
+          computedDeps[ keypath ],
+          function (keypath) {
+            if (keypath) {
+              collect(keypath, filter, deps)
+            }
+          }
+        )
+        addDep(keypath, env.TRUE)
+      }
+      else {
+        addDep(keypath)
+      }
+
+      return deps
+
+    }
 
     object.each(
       watchers,
       function (value, keypath) {
-        let currentValue = instance.get(keypath)
-        if (is.func(value)) {
-          emitter[ method ](keypath, value)
+
+        let watcher = value, sync
+        if (is.object(value)) {
+          watcher = value.watcher
+          sync = value.sync
         }
-        else if (is.object(value)) {
-          emitter[ method ](keypath, value.watcher)
-          if (value.sync) {
-            execute(
-              value.watcher,
-              context,
-              [ currentValue, cache[ keypath ], keypath ]
-            )
-          }
+
+        let list = families[ keypath ] || (families[ keypath ] = [ ])
+        let item = new Family(keypath, collect(keypath, keypath), watcher)
+        array.push(list, item)
+
+        action(instance, item, emitter)
+
+        if (sync) {
+          execute(
+            watcher,
+            context,
+            [ instance.get(keypath), env.UNDEFINED, keypath ]
+          )
         }
-        if (!object.has(cache, keypath)) {
-          saveToCache(cache, keypath, currentValue)
-        }
+
       }
     )
 
@@ -474,82 +503,51 @@ function createWatch(method) {
 }
 
 /**
- * 保存到 cache 中，方便下次对比
+ * keypath deps watcher 三者的综合体
+ * 绑定在一起方便进行增删
  */
-function saveToCache(cache, keypath, value) {
-  if (!string.has(keypath, '*')) {
-    cache[ keypath ] = value
+class Family {
+
+  constructor(keypath, value, watcher) {
+    this.keypath = keypath
+    this.deps = [ ]
+    this.watcher = watcher
   }
+
+  execute(emitter, action) {
+    let instance = this
+    emitter[ action ](instance.keypath, instance.watcher)
+    array.each(
+      instance.deps,
+      function (keypath) {
+        emitter[ action ](keypath, instance.watcher)
+      }
+    )
+  }
+
 }
 
 /**
  * 从 data 对象的所有 key 中，选择和 keypath 最匹配的那一个
  *
- * @inner
  * @param {Object} data
  * @param {Object} keypath
  * @return {Object}
  */
 function matchKeypath(data, keypath) {
 
-  let value, rest
-
-  array.each(
+  let result = matchFirst(
     object.sort(data, env.TRUE),
-    function (prefix, index) {
-      if (string.startsWith(keypath, prefix)) {
-        value = data[ prefix ]
-        rest = string.slice(keypath, prefix.length)
-        return env.FALSE
-      }
-    }
+    keypath
   )
 
+  let matched = result[ 0 ], rest = result[ 1 ]
+
   return {
-    value,
+    matched,
     rest: rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)
       ? string.slice(rest, 1)
       : rest
-  }
-
-}
-
-/**
- * 收集依赖
- *
- * @inner
- * @param {Array} collection
- * @param {string} keypath
- * @param {Object} deps 依赖关系
- * @return {Object}
- */
-function collectDeps(collection, keypath, deps) {
-
-  // 排序，把依赖最少的放前面
-  let addKey = function (keypath, push) {
-    if (!array.has(collection, keypath)) {
-      if (push) {
-        array.push(collection, keypath)
-      }
-      else {
-        array.unshift(collection, keypath)
-      }
-    }
-  }
-
-  if (deps && !array.falsy(deps[ keypath ])) {
-    array.each(
-      deps[ keypath ],
-      function (keypath) {
-        if (keypath) {
-          collectDeps(collection, keypath, deps)
-        }
-      }
-    )
-    addKey(keypath, env.TRUE)
-  }
-  else {
-    addKey(keypath)
   }
 
 }
