@@ -244,12 +244,14 @@ export default class Observer {
 
     let {
       data,
+      families,
       emitter,
       context,
       computedGetters,
       computedSetters,
     } = instance
 
+    let allKeys = object.keys(families)
 
     object.each(
       model,
@@ -258,11 +260,14 @@ export default class Observer {
         // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
-        // 旧值，便于对比
-        oldValue = instance.get(keypath)
-        if (newValue !== oldValue) {
-          differences[ keypath ] = [ newValue, oldValue, keypath ]
-        }
+        array.each(
+          allKeys,
+          function (key) {
+            if (string.startsWith(key, keypath)) {
+              differences[ key ] = [ instance.get(key), key ]
+            }
+          }
+        )
 
         // 如果有计算属性，则优先处理它
         if (computedSetters) {
@@ -292,11 +297,15 @@ export default class Observer {
     object.each(
       differences,
       function (difference, keypath) {
-        emitter.fire(
-          keypath,
-          difference,
-          context
-        )
+        let newValue = instance.get(keypath)
+        if (newValue !== difference[ 0 ]) {
+          difference.unshift(newValue)
+          emitter.fire(
+            keypath,
+            difference,
+            context
+          )
+        }
       }
     )
 
