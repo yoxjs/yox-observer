@@ -161,13 +161,13 @@ export default class Observer {
 
       if (computedGetters) {
 
-        let { matched, rest } = matchKeypath(computedGetters, keypath)
+        let { value, rest } = matchKeypath(computedGetters, keypath)
 
-        if (matched) {
-          matched = matched()
-          return rest && !is.primitive(matched)
-            ? object.get(matched, rest)
-            : { value: matched }
+        if (value) {
+          value = value()
+          return rest && !is.primitive(value)
+            ? object.get(value, rest)
+            : { value }
         }
 
       }
@@ -277,11 +277,11 @@ export default class Observer {
             return
           }
           else {
-            let { matched, rest } = matchKeypath(computedGetters, keypath)
-            if (matched && rest) {
-              matched = matched()
-              if (!is.primitive(matched)) {
-                object.set(matched, rest, newValue)
+            let { value, rest } = matchKeypath(computedGetters, keypath)
+            if (value && rest) {
+              value = value()
+              if (!is.primitive(value)) {
+                object.set(value, rest, newValue)
               }
               return
             }
@@ -550,13 +550,18 @@ function matchKeypath(data, keypath) {
     keypath
   )
 
-  let matched = result[ 0 ], rest = result[ 1 ]
+  let matched = result[ 0 ], rest = result[ 1 ], value
+  if (matched) {
+    value = data[ matched ]
+  }
+
+  if (rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)) {
+    rest = string.slice(rest, 1)
+  }
 
   return {
-    matched,
-    rest: rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)
-      ? string.slice(rest, 1)
-      : rest
+    value,
+    rest,
   }
 
 }
