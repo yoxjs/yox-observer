@@ -366,7 +366,9 @@ export default class Observer {
     } = this
 
     if (deps !== computedDeps[ keypath ]) {
+
       computedDeps[ keypath ] = deps
+      updateWatchKeypaths(this)
 
       // 全量更新
       computedDepsReversed = this.computedDepsReversed = { }
@@ -432,17 +434,16 @@ object.extend(
      */
     unwatch: function (keypath, watcher) {
       this.emitter.off(keypath, watcher)
-      flattenWatchKeypaths(instance)
+      updateWatchKeypaths(this)
     }
 
   }
 )
 
-function flattenWatchKeypaths(instance) {
+function updateWatchKeypaths(instance) {
 
   let {
     emitter,
-    computed,
     computedDeps,
   } = instance
 
@@ -458,9 +459,7 @@ function flattenWatchKeypaths(instance) {
   object.each(
     emitter.listeners,
     function (list, key) {
-      if (list.length) {
-        addKeypath(key)
-      }
+      addKeypath(key)
     }
   )
 
@@ -514,7 +513,7 @@ function createWatch(action) {
         }
 
         emitter[ action ](keypath, watcher)
-        flattenWatchKeypaths(instance)
+        updateWatchKeypaths(instance)
 
         if (sync) {
           execute(
