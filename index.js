@@ -32,9 +32,14 @@ export default class Observer {
     let instance = this
 
     instance.data = data
+    instance.cache = { }
     instance.emitter = new Emitter()
-    instance.families = { }
     instance.context = context || instance
+
+    // 谁依赖了谁
+    instance.computedDeps = { }
+    // 谁被谁依赖
+    instance.computedDepsReversed = { }
 
     // 计算属性也是数据
     if (is.object(computed)) {
@@ -45,7 +50,6 @@ export default class Observer {
 
       // 辅助获取计算属性的依赖
       instance.computedStack = [ ]
-      instance.computedDeps = { }
 
       // 计算属性的缓存
       instance.computedCache = { }
@@ -53,7 +57,6 @@ export default class Observer {
       let {
         computedCache,
         computedStack,
-        computedDeps,
         computedGetters,
         computedSetters
       } = instance
@@ -84,11 +87,14 @@ export default class Observer {
 
           if (get) {
 
-            let watcher = function () {
-              if (object.has(computedCache, keypath)) {
-                delete computedCache[ keypath ]
+            instance.watch(
+              keypath,
+              function () {
+                if (object.has(computedCache, keypath)) {
+                  delete computedCache[ keypath ]
+                }
               }
-            }
+            )
 
             let getter = function () {
               if (cache && object.has(computedCache, keypath)) {
@@ -104,9 +110,10 @@ export default class Observer {
                 computedCache[ keypath ] = result
               }
 
-              let newDeps = deps || array.pop(computedStack)
-              let oldDeps = computedDeps[ keypath ]
-              computedDeps[ keypath ] = instance.diff(newDeps, oldDeps, watcher)
+              instance.setComputedDeps(
+                keypath,
+                deps || array.pop(computedStack)
+              )
 
               return result
 
@@ -240,31 +247,55 @@ export default class Observer {
    */
   set(model) {
 
-    let instance = this, differences = [ ]
+    let instance = this, differences = { }
 
     let {
       data,
-      families,
+      cache,
       emitter,
       context,
+      computedDeps,
+      computedDepsReversed,
       computedGetters,
       computedSetters,
+      watchKeypaths,
     } = instance
 
-    let allKeys = object.keys(families)
+    let addDifference = function (key, data, extra) {
+      if (!differences[ key ]) {
+        if (extra) {
+          array.push(data, extra)
+        }
+        differences[ key ] = data
+      }
+    }
 
     object.each(
       model,
-      function (newValue, keypath, oldValue) {
+      function (newValue, keypath) {
 
         // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
         array.each(
-          allKeys,
+          watchKeypaths,
           function (key) {
-            if (string.startsWith(key, keypath)) {
-              differences[ key ] = [ instance.get(key), key ]
+            if (string.has(key, '*')) {
+              let pattern = getKeypathPattern(key)
+              let match = keypath.match(pattern)
+              if (match) {
+                addDifference(
+                  keypath,
+                  [ instance.get(keypath), keypath ],
+                  array.toArray(match).slice(1)
+                )
+              }
+            }
+            else if (string.startsWith(key, keypath)) {
+              addDifference(
+                key,
+                [ instance.get(key), key ]
+              )
             }
           }
         )
@@ -305,42 +336,59 @@ export default class Observer {
             difference,
             context
           )
+
+          let list = computedDepsReversed[ keypath ]
+          if (list) {
+            array.each(
+              list,
+              function (keypath) {
+                newValue = instance.get(keypath)
+                emitter.fire(
+                  keypath,
+                  [ newValue, newValue, keypath ],
+                  context
+                )
+              }
+            )
+          }
+
         }
       }
     )
 
   }
 
-  /**
-   * 为一批 keypath 注册一个 watcher
-   */
-  diff(newKeypaths, oldKeypaths, watcher) {
+  setComputedDeps(keypath, deps) {
 
-    if (newKeypaths !== oldKeypaths) {
+    let {
+      computedDeps,
+      computedDepsReversed,
+    } = this
 
-      let instance = this
+    if (deps !== computedDeps[ keypath ]) {
+      computedDeps[ keypath ] = deps
 
-      oldKeypaths = oldKeypaths || [ ]
-      array.each(
-        newKeypaths,
-        function (keypath) {
-          if (!array.has(oldKeypaths, keypath)) {
-            instance.watch(keypath, watcher)
-          }
-        }
-      )
-      array.each(
-        oldKeypaths,
-        function (keypath) {
-          if (!array.has(newKeypaths, keypath)) {
-            instance.unwatch(keypath, watcher)
-          }
+      // 全量更新
+      computedDepsReversed = this.computedDepsReversed = { }
+
+      let addDep = function (dep, keypath) {
+        let list = computedDepsReversed[ dep ] || (computedDepsReversed[ dep ] = [ ])
+        array.push(list, keypath)
+      }
+
+      object.each(
+        computedDeps,
+        function (deps, key) {
+          array.each(
+            deps,
+            function (dep) {
+              addDep(dep, key)
+            }
+          )
         }
       )
 
     }
-
-    return newKeypaths
 
   }
 
@@ -365,11 +413,7 @@ object.extend(
      * @param {?Function} watcher
      * @param {?boolean} sync
      */
-    watch: createWatch(
-      function (instance, family, emitter) {
-        family.execute(emitter, 'on')
-      }
-    ),
+    watch: createWatch('on'),
 
     /**
      * 监听一次数据变化
@@ -378,14 +422,7 @@ object.extend(
      * @param {?Function} watcher
      * @param {?boolean} sync
      */
-    watchOnce: createWatch(
-      function (instance, family, emitter) {
-        family.watcher.$magic = function () {
-          instance.unwatch(family.keypath, family.watcher)
-        }
-        family.execute(emitter, 'on')
-      }
-    ),
+    watchOnce: createWatch('once'),
 
     /**
      * 取消监听数据变化
@@ -394,28 +431,53 @@ object.extend(
      * @param {?Function} watcher
      */
     unwatch: function (keypath, watcher) {
-      let { emitter, families } = this
-      object.each(
-        families,
-        function (list, key) {
-          if (key === keypath) {
-            array.each(
-              list,
-              function (family, index) {
-                if (family.watcher === watcher) {
-                  family.execute(emitter, 'off')
-                  list.splice(index, 1)
-                }
-              },
-              env.TRUE
-            )
-          }
-        }
-      )
+      this.emitter.off(keypath, watcher)
+      flattenWatchKeypaths(instance)
     }
 
   }
 )
+
+function flattenWatchKeypaths(instance) {
+
+  let {
+    emitter,
+    computed,
+    computedDeps,
+  } = instance
+
+  let watchKeypaths = { }
+
+  let addKeypath = function (keypath) {
+    if (!watchKeypaths[ keypath ]) {
+      watchKeypaths[ keypath ] = env.TRUE
+    }
+  }
+
+  // 1. 直接通过 watch 注册的
+  object.each(
+    emitter.listeners,
+    function (list, key) {
+      if (list.length) {
+        addKeypath(key)
+      }
+    }
+  )
+
+  // 2. 计算属性的依赖属于间接 watch
+  object.each(
+    computedDeps,
+    function (deps) {
+      array.each(
+        deps,
+        addKeypath
+      )
+    }
+  )
+
+  instance.watchKeypaths = object.keys(watchKeypaths)
+
+}
 
 /**
  * watch 和 watchOnce 逻辑相同
@@ -438,47 +500,8 @@ function createWatch(action) {
 
     let {
       emitter,
-      families,
       context,
-      computedDeps,
     } = instance
-
-    let collect = function (keypath, filter, deps) {
-
-      if (!deps) {
-        deps = [ ]
-      }
-
-      // 排序，把依赖最少的放前面
-      let addDep = function (keypath, push) {
-        if (keypath !== filter && !array.has(deps, keypath)) {
-          if (push) {
-            array.push(deps, keypath)
-          }
-          else {
-            array.unshift(deps, keypath)
-          }
-        }
-      }
-
-      if (computedDeps && !array.falsy(computedDeps[ keypath ])) {
-        array.each(
-          computedDeps[ keypath ],
-          function (keypath) {
-            if (keypath) {
-              collect(keypath, filter, deps)
-            }
-          }
-        )
-        addDep(keypath, env.TRUE)
-      }
-      else {
-        addDep(keypath)
-      }
-
-      return deps
-
-    }
 
     object.each(
       watchers,
@@ -490,11 +513,8 @@ function createWatch(action) {
           sync = value.sync
         }
 
-        let list = families[ keypath ] || (families[ keypath ] = [ ])
-        let item = new Family(keypath, collect(keypath, keypath), watcher)
-        array.push(list, item)
-
-        action(instance, item, emitter)
+        emitter[ action ](keypath, watcher)
+        flattenWatchKeypaths(instance)
 
         if (sync) {
           execute(
@@ -511,29 +531,21 @@ function createWatch(action) {
 
 }
 
+
+let patternCache = { }
+
 /**
- * keypath deps watcher 三者的综合体
- * 绑定在一起方便进行增删
+ * 模糊匹配 Keypath
  */
-class Family {
-
-  constructor(keypath, value, watcher) {
-    this.keypath = keypath
-    this.deps = [ ]
-    this.watcher = watcher
+function getKeypathPattern(keypath) {
+  if (!patternCache[ keypath ]) {
+    let literal = keypath
+      .replace(/\./g, '\\.')
+      .replace(/\*\*/g, '([\.\\w]+?)')
+      .replace(/\*/g, '(\\w+)')
+    patternCache[ keypath ] = new RegExp(`^${literal}$`)
   }
-
-  execute(emitter, action) {
-    let instance = this
-    emitter[ action ](instance.keypath, instance.watcher)
-    array.each(
-      instance.deps,
-      function (keypath) {
-        emitter[ action ](keypath, instance.watcher)
-      }
-    )
-  }
-
+  return patternCache[ keypath ]
 }
 
 /**
