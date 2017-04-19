@@ -259,6 +259,7 @@ export default class Observer {
       computedGetters,
       computedSetters,
       watchKeypaths,
+      reversedKeypaths,
     } = instance
 
     let addDifference = function (key, data, extra) {
@@ -284,27 +285,29 @@ export default class Observer {
         // 如果 set 了 user.name
         // 但是 watch 了 *.name
         //
-        array.each(
-          watchKeypaths,
-          function (key) {
-            if (string.has(key, '*')) {
-              let match = matchKeypath(keypath, key)
-              if (match) {
+        if (watchKeypaths) {
+          array.each(
+            watchKeypaths,
+            function (key) {
+              if (string.has(key, '*')) {
+                let match = matchKeypath(keypath, key)
+                if (match) {
+                  addDifference(
+                    keypath,
+                    [ instance.get(keypath), keypath ],
+                    match
+                  )
+                }
+              }
+              else if (string.startsWith(key, keypath)) {
                 addDifference(
-                  keypath,
-                  [ instance.get(keypath), keypath ],
-                  match
+                  key,
+                  [ instance.get(key), key ]
                 )
               }
             }
-            else if (string.startsWith(key, keypath)) {
-              addDifference(
-                key,
-                [ instance.get(key), key ]
-              )
-            }
-          }
-        )
+          )
+        }
 
         // 如果有计算属性，则优先处理它
         if (computedSetters) {
@@ -331,35 +334,40 @@ export default class Observer {
       }
     )
 
-    let fired = { }, reversedKeys = object.keys(computedDepsReversed)
+    let changed = { }
     let fireChange = function (keypath, args) {
-      if (!fired[ keypath ]) {
-        fired[ keypath ] = env.TRUE
+      if (!changed[ keypath ]) {
+        changed[ keypath ] = env.TRUE
         emitter.fire(keypath, args, context)
 
-        array.each(
-          reversedKeys,
-          function (key) {
-            let list, match
-            if (key === keypath) {
-              list = computedDepsReversed[ key ]
-            }
-            else if (string.has(key, '*')) {
-              match = matchKeypath(keypath, key)
-              if (match) {
+        if (reversedKeypaths) {
+          array.each(
+            reversedKeypaths,
+            function (key) {
+              let list, match
+              if (key === keypath) {
                 list = computedDepsReversed[ key ]
               }
-            }
-            if (list) {
-              array.each(
-                list,
-                function (key) {
-                  fireChange(key)
+              else if (string.has(key, '*')) {
+                match = matchKeypath(keypath, key)
+                if (match) {
+                  list = computedDepsReversed[ key ]
                 }
-              )
+              }
+              if (list) {
+                array.each(
+                  list,
+                  function (key) {
+                    fireChange(
+                      key,
+                      [ instance.get(key), env.UNDEFINED, key ]
+                    )
+                  }
+                )
+              }
             }
-          }
-        )
+          )
+        }
 
       }
     }
@@ -379,18 +387,20 @@ export default class Observer {
 
   setComputedDeps(keypath, deps) {
 
+    let instance = this
+
     let {
       computedDeps,
       computedDepsReversed,
-    } = this
+    } = instance
 
     if (deps !== computedDeps[ keypath ]) {
 
       computedDeps[ keypath ] = deps
-      updateWatchKeypaths(this)
+      updateWatchKeypaths(instance)
 
       // 全量更新
-      computedDepsReversed = this.computedDepsReversed = { }
+      computedDepsReversed = instance.computedDepsReversed = { }
 
       let addDep = function (dep, keypath) {
         let list = computedDepsReversed[ dep ] || (computedDepsReversed[ dep ] = [ ])
@@ -408,6 +418,8 @@ export default class Observer {
           )
         }
       )
+
+      instance.reversedKeypaths = object.keys(computedDepsReversed)
 
     }
 
