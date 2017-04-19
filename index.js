@@ -168,7 +168,7 @@ export default class Observer {
 
       if (computedGetters) {
 
-        let { value, rest } = matchKeypath(computedGetters, keypath)
+        let { value, rest } = matchBestGetter(computedGetters, keypath)
 
         if (value) {
           value = value()
@@ -277,17 +277,23 @@ export default class Observer {
         // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
+        //
+        // 如果 set 了 user
+        // 但是 watch 了 user.name
+        //
+        // 如果 set 了 user.name
+        // 但是 watch 了 *.name
+        //
         array.each(
           watchKeypaths,
           function (key) {
             if (string.has(key, '*')) {
-              let pattern = getKeypathPattern(key)
-              let match = keypath.match(pattern)
+              let match = matchKeypath(keypath, key)
               if (match) {
                 addDifference(
                   keypath,
                   [ instance.get(keypath), keypath ],
-                  array.toArray(match).slice(1)
+                  match
                 )
               }
             }
@@ -308,7 +314,7 @@ export default class Observer {
             return
           }
           else {
-            let { value, rest } = matchKeypath(computedGetters, keypath)
+            let { value, rest } = matchBestGetter(computedGetters, keypath)
             if (value && rest) {
               value = value()
               if (!is.primitive(value)) {
@@ -325,33 +331,46 @@ export default class Observer {
       }
     )
 
+    let fired = { }, reversedKeys = object.keys(computedDepsReversed)
+    let fireChange = function (keypath, args) {
+      if (!fired[ keypath ]) {
+        fired[ keypath ] = env.TRUE
+        emitter.fire(keypath, args, context)
+
+        array.each(
+          reversedKeys,
+          function (key) {
+            let list, match
+            if (key === keypath) {
+              list = computedDepsReversed[ key ]
+            }
+            else if (string.has(key, '*')) {
+              match = matchKeypath(keypath, key)
+              if (match) {
+                list = computedDepsReversed[ key ]
+              }
+            }
+            if (list) {
+              array.each(
+                list,
+                function (key) {
+                  fireChange(key)
+                }
+              )
+            }
+          }
+        )
+
+      }
+    }
+
     object.each(
       differences,
       function (difference, keypath) {
         let newValue = instance.get(keypath)
         if (newValue !== difference[ 0 ]) {
           difference.unshift(newValue)
-          emitter.fire(
-            keypath,
-            difference,
-            context
-          )
-
-          let list = computedDepsReversed[ keypath ]
-          if (list) {
-            array.each(
-              list,
-              function (keypath) {
-                newValue = instance.get(keypath)
-                emitter.fire(
-                  keypath,
-                  [ newValue, newValue, keypath ],
-                  context
-                )
-              }
-            )
-          }
-
+          fireChange(keypath, difference)
         }
       }
     )
@@ -535,35 +554,42 @@ let patternCache = { }
 
 /**
  * 模糊匹配 Keypath
+ *
+ * @param {string} keypath
+ * @param {string} pattern
  */
-function getKeypathPattern(keypath) {
-  if (!patternCache[ keypath ]) {
-    let literal = keypath
+function matchKeypath(keypath, pattern) {
+  let cache = patternCache[ pattern ]
+  if (!cache) {
+    cache = pattern
       .replace(/\./g, '\\.')
       .replace(/\*\*/g, '([\.\\w]+?)')
       .replace(/\*/g, '(\\w+)')
-    patternCache[ keypath ] = new RegExp(`^${literal}$`)
+    cache = patternCache[ pattern ] = new RegExp(`^${cache}$`)
   }
-  return patternCache[ keypath ]
+  let match = keypath.match(cache)
+  if (match) {
+    return array.toArray(match).slice(1)
+  }
 }
 
 /**
- * 从 data 对象的所有 key 中，选择和 keypath 最匹配的那一个
+ * 从 getter 对象的所有 key 中，选择和 keypath 最匹配的那一个
  *
- * @param {Object} data
- * @param {Object} keypath
+ * @param {Object} getter
+ * @param {string} keypath
  * @return {Object}
  */
-function matchKeypath(data, keypath) {
+function matchBestGetter(getter, keypath) {
 
   let result = matchFirst(
-    object.sort(data, env.TRUE),
+    object.sort(getter, env.TRUE),
     keypath
   )
 
   let matched = result[ 0 ], rest = result[ 1 ], value
   if (matched) {
-    value = data[ matched ]
+    value = getter[ matched ]
   }
 
   if (rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)) {
