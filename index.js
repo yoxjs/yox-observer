@@ -1,6 +1,7 @@
 
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
+import * as char from 'yox-common/util/char'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
@@ -32,14 +33,15 @@ export default class Observer {
     let instance = this
 
     instance.data = data
-    instance.cache = { }
     instance.emitter = new Emitter()
     instance.context = context || instance
 
     // 谁依赖了谁
-    instance.computedDeps = { }
+    instance.deps = { }
     // 谁被谁依赖
-    instance.computedDepsReversed = { }
+    instance.reversedDeps = { }
+    // 缓存上一次访问的值
+    instance.valueCache = { }
 
     // 计算属性也是数据
     if (is.object(computed)) {
@@ -51,14 +53,9 @@ export default class Observer {
       // 辅助获取计算属性的依赖
       instance.computedStack = [ ]
 
-      // 计算属性的缓存
-      instance.computedCache = { }
-
       let {
-        computedCache,
+        valueCache,
         computedStack,
-        computedGetters,
-        computedSetters
       } = instance
 
       object.each(
@@ -90,15 +87,15 @@ export default class Observer {
             instance.watch(
               keypath,
               function () {
-                if (object.has(computedCache, keypath)) {
-                  delete computedCache[ keypath ]
+                if (object.has(valueCache, keypath)) {
+                  delete valueCache[ keypath ]
                 }
               }
             )
 
             let getter = function () {
-              if (cache && object.has(computedCache, keypath)) {
-                return computedCache[ keypath ]
+              if (cache && object.has(valueCache, keypath)) {
+                return valueCache[ keypath ]
               }
 
               if (!deps) {
@@ -106,11 +103,9 @@ export default class Observer {
               }
 
               let result = execute(get, instance.context)
-              if (cache) {
-                computedCache[ keypath ] = result
-              }
+              valueCache[ keypath ] = result
 
-              instance.setComputedDeps(
+              instance.setDeps(
                 keypath,
                 deps || array.pop(computedStack)
               )
@@ -120,12 +115,12 @@ export default class Observer {
             }
 
             getter.toString =
-            computedGetters[ keypath ] = getter
+            instance.computedGetters[ keypath ] = getter
 
           }
 
           if (set) {
-            computedSetters[ keypath ] = set
+            instance.computedSetters[ keypath ] = set
           }
 
         }
@@ -144,7 +139,7 @@ export default class Observer {
    * 当传了 context，会尝试向上寻找
    *
    * @param {string} keypath
-   * @param {string} context
+   * @param {?string} context
    * @return {?*}
    */
   get(keypath, context) {
@@ -153,6 +148,7 @@ export default class Observer {
 
     let {
       data,
+      valueCache,
       computedStack,
       computedGetters,
     } = instance
@@ -166,20 +162,26 @@ export default class Observer {
         }
       }
 
+      let result
       if (computedGetters) {
-
-        let { value, rest } = matchBestGetter(computedGetters, keypath)
-
-        if (value) {
-          value = value()
-          return rest && !is.primitive(value)
-            ? object.get(value, rest)
-            : { value }
+        let { getter, rest } = matchBestGetter(computedGetters, keypath)
+        if (getter) {
+          getter = getter()
+          result = rest && !is.primitive(getter)
+            ? object.get(getter, rest)
+            : { value: getter }
         }
-
       }
 
-      return object.get(data, keypath)
+      if (!result) {
+        result = object.get(data, keypath)
+      }
+
+      if (result) {
+        valueCache[ keypath ] = result.value
+      }
+
+      return result
 
     }
 
@@ -247,27 +249,51 @@ export default class Observer {
    */
   set(model) {
 
-    let instance = this, differences = { }
+    let instance = this
 
     let {
       data,
       cache,
       emitter,
       context,
-      computedDeps,
-      computedDepsReversed,
+      deps,
+      reversedDeps,
+      valueCache,
       computedGetters,
       computedSetters,
       watchKeypaths,
       reversedKeypaths,
     } = instance
 
-    let addDifference = function (key, data, extra) {
-      if (!differences[ key ]) {
-        if (extra) {
-          array.push(data, extra)
-        }
-        differences[ key ] = data
+    let oldCache = { }, newCache = { }
+    let getOldValue = function (keypath) {
+      if (!object.has(oldCache, keypath)) {
+        oldCache[ keypath ] = valueCache[ keypath ]
+      }
+      return oldCache[ keypath ]
+    }
+    let getNewValue = function (keypath) {
+      if (!object.has(newCache, keypath)) {
+        newCache[ keypath ] = instance.get(keypath)
+      }
+      return newCache[ keypath ]
+    }
+
+    let differences = [ ], differenceMap = { }
+    let addDifference = function (keypath, realpath, oldValue, match, force) {
+      let fullpath = keypath + char.CHAR_DASH + realpath
+      if (!differenceMap[ fullpath ]) {
+        differenceMap[ fullpath ] = env.TRUE
+        array.push(
+          differences,
+          {
+            keypath,
+            realpath,
+            oldValue,
+            match,
+            force,
+          }
+        )
       }
     }
 
@@ -278,36 +304,7 @@ export default class Observer {
         // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
-        //
-        // 如果 set 了 user
-        // 但是 watch 了 user.name
-        //
-        // 如果 set 了 user.name
-        // 但是 watch 了 *.name
-        //
-        if (watchKeypaths) {
-          array.each(
-            watchKeypaths,
-            function (key) {
-              if (string.has(key, '*')) {
-                let match = matchKeypath(keypath, key)
-                if (match) {
-                  addDifference(
-                    keypath,
-                    [ instance.get(keypath), keypath ],
-                    match
-                  )
-                }
-              }
-              else if (string.startsWith(key, keypath)) {
-                addDifference(
-                  key,
-                  [ instance.get(key), key ]
-                )
-              }
-            }
-          )
-        }
+        addDifference(keypath, keypath, getOldValue(keypath))
 
         // 如果有计算属性，则优先处理它
         if (computedSetters) {
@@ -317,11 +314,11 @@ export default class Observer {
             return
           }
           else {
-            let { value, rest } = matchBestGetter(computedGetters, keypath)
-            if (value && rest) {
-              value = value()
-              if (!is.primitive(value)) {
-                object.set(value, rest, newValue)
+            let { getter, rest } = matchBestGetter(computedGetters, keypath)
+            if (getter && rest) {
+              getter = getter()
+              if (!is.primitive(getter)) {
+                object.set(getter, rest, newValue)
               }
               return
             }
@@ -334,92 +331,109 @@ export default class Observer {
       }
     )
 
-    let changed = { }
-    let fireChange = function (keypath, args) {
-      if (!changed[ keypath ]) {
-        changed[ keypath ] = env.TRUE
+    let watchedMap = { }, reversedMap = { }
+    let fireChange = function ({ keypath, realpath, oldValue, match, force }) {
+      let newValue = getNewValue(realpath)
+      if (force || oldValue !== newValue) {
+        let args = [ newValue, oldValue, keypath ]
+        if (match) {
+          array.push(args, match)
+        }
         emitter.fire(keypath, args, context)
 
-        if (reversedKeypaths) {
+        if (watchKeypaths && !watchedMap[ realpath ]) {
+          watchedMap[ realpath ] = env.TRUE
+          array.each(
+            watchKeypaths,
+            function (key) {
+              if (string.has(key, '*')) {
+                let match = matchKeypath(realpath, key)
+                if (match) {
+                  addDifference(key, realpath, getOldValue(realpath), match)
+                }
+              }
+              else if (string.startsWith(key, realpath)) {
+                addDifference(key, realpath, getOldValue(realpath))
+              }
+            }
+          )
+        }
+
+        if (reversedKeypaths && !reversedMap[ keypath ]) {
+          reversedMap[ keypath ] = env.TRUE
           array.each(
             reversedKeypaths,
             function (key) {
               let list, match
               if (key === keypath) {
-                list = computedDepsReversed[ key ]
+                list = reversedDeps[ key ]
               }
               else if (string.has(key, '*')) {
                 match = matchKeypath(keypath, key)
                 if (match) {
-                  list = computedDepsReversed[ key ]
+                  list = reversedDeps[ key ]
                 }
               }
               if (list) {
                 array.each(
                   list,
                   function (key) {
-                    fireChange(
-                      key,
-                      [ instance.get(key), env.UNDEFINED, key ]
-                    )
+                    addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
                   }
                 )
               }
             }
           )
         }
-
       }
     }
 
-    object.each(
-      differences,
-      function (difference, keypath) {
-        let newValue = instance.get(keypath)
-        if (newValue !== difference[ 0 ]) {
-          difference.unshift(newValue)
-          fireChange(keypath, difference)
-        }
-      }
-    )
+    for (let i = 0; i < differences.length; i++) {
+      fireChange(differences[ i ])
+    }
 
   }
 
-  setComputedDeps(keypath, deps) {
+  setDeps(keypath, newDeps) {
 
     let instance = this
 
     let {
-      computedDeps,
-      computedDepsReversed,
+      deps,
+      reversedDeps,
+      valueCache,
     } = instance
 
-    if (deps !== computedDeps[ keypath ]) {
+    if (newDeps !== deps[ keypath ]) {
 
-      computedDeps[ keypath ] = deps
+      if (is.object(newDeps)) {
+        object.extend(valueCache, newDeps)
+        newDeps = object.keys(newDeps)
+      }
+
+      deps[ keypath ] = newDeps
       updateWatchKeypaths(instance)
 
       // 全量更新
-      computedDepsReversed = instance.computedDepsReversed = { }
-
-      let addDep = function (dep, keypath) {
-        let list = computedDepsReversed[ dep ] || (computedDepsReversed[ dep ] = [ ])
-        array.push(list, keypath)
-      }
+      reversedDeps = { }
 
       object.each(
-        computedDeps,
+        deps,
         function (deps, key) {
           array.each(
             deps,
             function (dep) {
-              addDep(dep, key)
+              array.push(
+                reversedDeps[ dep ] || (reversedDeps[ dep ] = [ ]),
+                key
+              )
             }
           )
         }
       )
 
-      instance.reversedKeypaths = object.keys(computedDepsReversed)
+      instance.reversedDeps = reversedDeps
+      instance.reversedKeypaths = object.keys(reversedDeps)
 
     }
 
@@ -474,16 +488,14 @@ object.extend(
 function updateWatchKeypaths(instance) {
 
   let {
+    deps,
     emitter,
-    computedDeps,
   } = instance
 
   let watchKeypaths = { }
 
   let addKeypath = function (keypath) {
-    if (!watchKeypaths[ keypath ]) {
-      watchKeypaths[ keypath ] = env.TRUE
-    }
+    watchKeypaths[ keypath ] = env.TRUE
   }
 
   // 1. 直接通过 watch 注册的
@@ -496,7 +508,7 @@ function updateWatchKeypaths(instance) {
 
   // 2. 计算属性的依赖属于间接 watch
   object.each(
-    computedDeps,
+    deps,
     function (deps) {
       array.each(
         deps,
@@ -588,29 +600,24 @@ function matchKeypath(keypath, pattern) {
 /**
  * 从 getter 对象的所有 key 中，选择和 keypath 最匹配的那一个
  *
- * @param {Object} getter
+ * @param {Object} getters
  * @param {string} keypath
  * @return {Object}
  */
-function matchBestGetter(getter, keypath) {
+function matchBestGetter(getters, keypath) {
 
   let result = matchFirst(
-    object.sort(getter, env.TRUE),
+    object.sort(getters, env.TRUE),
     keypath
   )
 
-  let matched = result[ 0 ], rest = result[ 1 ], value
-  if (matched) {
-    value = getter[ matched ]
-  }
-
-  if (rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)) {
-    rest = string.slice(rest, 1)
-  }
+  let matched = result[ 0 ], rest = result[ 1 ]
 
   return {
-    value,
-    rest,
+    getter: matched ? getters[ matched ] : env.NULL,
+    rest: rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)
+      ? string.slice(rest, 1)
+      : rest
   }
 
 }
