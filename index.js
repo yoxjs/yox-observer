@@ -295,13 +295,72 @@ export default class Observer {
       }
     }
 
+    let watchedMap = { }
+    let addWatchKeypath = function (keypath) {
+      // 最后触发主动监听的 keypath，相当于捡漏
+      // 比如修改了 user 但是 watch 了 user.name
+      // 这时需要确保 user.name 也能触发变化
+      if (watchKeypaths && !watchedMap[ keypath ]) {
+        watchedMap[ keypath ] = env.TRUE
+        array.each(
+          watchKeypaths,
+          function (key) {
+            if (isFuzzyKeypath(key)) {
+              let match = matchKeypath(keypath, key)
+              if (match) {
+                addDifference(key, keypath, getOldValue(keypath), match)
+              }
+            }
+            else if (string.startsWith(key, keypath)) {
+              addDifference(key, key, getOldValue(key))
+            }
+            // 为子组件传递数据，比如 user="{{user}}"
+            // 修改了 user.name 并不会引起子组件更新
+            else if (string.startsWith(keypath, key)) {
+              addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
+            }
+          }
+        )
+      }
+    }
+
+    let reversedMap = { }
+    let addReversedKeypath = function (keypath) {
+      if (reversedKeypaths && !reversedMap[ keypath ]) {
+        reversedMap[ keypath ] = env.TRUE
+        array.each(
+          reversedKeypaths,
+          function (key) {
+            let list, match
+            if (key === keypath) {
+              list = reversedDeps[ key ]
+            }
+            else if (isFuzzyKeypath(key)) {
+              match = matchKeypath(keypath, key)
+              if (match) {
+                list = reversedDeps[ key ]
+              }
+            }
+            if (list) {
+              array.each(
+                list,
+                function (key) {
+                  addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
+                }
+              )
+            }
+          }
+        )
+      }
+    }
+
     object.each(
       model,
       function (newValue, keypath) {
 
         keypath = keypathUtil.normalize(keypath)
 
-        addDifference(keypath, keypath, getOldValue(keypath))
+        addWatchKeypath(keypath)
 
         // 如果有计算属性，则优先处理它
         if (computedSetters) {
@@ -328,7 +387,7 @@ export default class Observer {
       }
     )
 
-    let watchedMap = { }, reversedMap = { }
+
     let fireChange = function ({ keypath, realpath, oldValue, match, force }) {
       let newValue = getNewValue(realpath)
       if (force || oldValue !== newValue) {
@@ -337,56 +396,8 @@ export default class Observer {
           array.push(args, match)
         }
         emitter.fire(keypath, args, context)
-
-        // 先触发依赖 keypath 的那些 keypath
-        // 因为当依赖变化时，父级应该首先得到通知
-        if (reversedKeypaths && !reversedMap[ keypath ]) {
-          reversedMap[ keypath ] = env.TRUE
-          array.each(
-            reversedKeypaths,
-            function (key) {
-              let list, match
-              if (key === keypath) {
-                list = reversedDeps[ key ]
-              }
-              else if (isFuzzyKeypath(key)) {
-                match = matchKeypath(keypath, key)
-                if (match) {
-                  list = reversedDeps[ key ]
-                }
-              }
-              if (list) {
-                array.each(
-                  list,
-                  function (key) {
-                    addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
-                  }
-                )
-              }
-            }
-          )
-        }
-
-        // 最后触发主动监听的 keypath，相当于捡漏
-        // 比如修改了 user 但是 watch 了 user.name
-        // 这时需要确保 user.name 也能触发变化
-        if (watchKeypaths && !watchedMap[ realpath ]) {
-          watchedMap[ realpath ] = env.TRUE
-          array.each(
-            watchKeypaths,
-            function (key) {
-              if (isFuzzyKeypath(key)) {
-                let match = matchKeypath(realpath, key)
-                if (match) {
-                  addDifference(key, realpath, getOldValue(realpath), match)
-                }
-              }
-              else if (string.startsWith(key, realpath)) {
-                addDifference(key, key, getOldValue(key))
-              }
-            }
-          )
-        }
+        addReversedKeypath(keypath)
+        addWatchKeypath(realpath)
       }
     }
 
