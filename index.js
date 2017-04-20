@@ -33,6 +33,7 @@ export default class Observer {
     let instance = this
 
     instance.data = data
+    instance.cache = { }
     instance.emitter = new Emitter()
     instance.context = context || instance
 
@@ -40,8 +41,6 @@ export default class Observer {
     instance.deps = { }
     // 谁被谁依赖
     instance.reversedDeps = { }
-    // 缓存上一次访问的值
-    instance.valueCache = { }
 
     // 计算属性也是数据
     if (is.object(computed)) {
@@ -54,7 +53,7 @@ export default class Observer {
       instance.computedStack = [ ]
 
       let {
-        valueCache,
+        cache,
         computedStack,
       } = instance
 
@@ -62,14 +61,14 @@ export default class Observer {
         computed,
         function (item, keypath) {
 
-          let get, set, deps, cache = env.TRUE
+          let get, set, deps, cacheable = env.TRUE
 
           if (is.func(item)) {
             get = item
           }
           else if (is.object(item)) {
             if (is.boolean(item.cache)) {
-              cache = item.cache
+              cacheable = item.cache
             }
             if (is.array(item.deps)) {
               deps = item.deps
@@ -87,15 +86,15 @@ export default class Observer {
             instance.watch(
               keypath,
               function () {
-                if (object.has(valueCache, keypath)) {
-                  delete valueCache[ keypath ]
+                if (object.has(cache, keypath)) {
+                  delete cache[ keypath ]
                 }
               }
             )
 
             let getter = function () {
-              if (cache && object.has(valueCache, keypath)) {
-                return valueCache[ keypath ]
+              if (cacheable && object.has(cache, keypath)) {
+                return cache[ keypath ]
               }
 
               if (!deps) {
@@ -103,7 +102,7 @@ export default class Observer {
               }
 
               let result = execute(get, instance.context)
-              valueCache[ keypath ] = result
+              cache[ keypath ] = result
 
               instance.setDeps(
                 keypath,
@@ -148,7 +147,7 @@ export default class Observer {
 
     let {
       data,
-      valueCache,
+      cache,
       computedStack,
       computedGetters,
     } = instance
@@ -178,7 +177,7 @@ export default class Observer {
       }
 
       if (result) {
-        valueCache[ keypath ] = result.value
+        cache[ keypath ] = result.value
       }
 
       return result
@@ -258,7 +257,6 @@ export default class Observer {
       context,
       deps,
       reversedDeps,
-      valueCache,
       computedGetters,
       computedSetters,
       watchKeypaths,
@@ -268,7 +266,7 @@ export default class Observer {
     let oldCache = { }, newCache = { }
     let getOldValue = function (keypath) {
       if (!object.has(oldCache, keypath)) {
-        oldCache[ keypath ] = valueCache[ keypath ]
+        oldCache[ keypath ] = cache[ keypath ]
       }
       return oldCache[ keypath ]
     }
@@ -301,7 +299,6 @@ export default class Observer {
       model,
       function (newValue, keypath) {
 
-        // 格式化成内部处理的格式
         keypath = keypathUtil.normalize(keypath)
 
         addDifference(keypath, keypath, getOldValue(keypath))
@@ -341,6 +338,8 @@ export default class Observer {
         }
         emitter.fire(keypath, args, context)
 
+        // 先触发依赖 keypath 的那些 keypath
+        // 因为当依赖变化时，父级应该首先得到通知
         if (reversedKeypaths && !reversedMap[ keypath ]) {
           reversedMap[ keypath ] = env.TRUE
           array.each(
@@ -350,7 +349,7 @@ export default class Observer {
               if (key === keypath) {
                 list = reversedDeps[ key ]
               }
-              else if (string.has(key, '*')) {
+              else if (isFuzzyKeypath(key)) {
                 match = matchKeypath(keypath, key)
                 if (match) {
                   list = reversedDeps[ key ]
@@ -368,12 +367,15 @@ export default class Observer {
           )
         }
 
+        // 最后触发主动监听的 keypath，相当于捡漏
+        // 比如修改了 user 但是 watch 了 user.name
+        // 这时需要确保 user.name 也能触发变化
         if (watchKeypaths && !watchedMap[ realpath ]) {
           watchedMap[ realpath ] = env.TRUE
           array.each(
             watchKeypaths,
             function (key) {
-              if (string.has(key, '*')) {
+              if (isFuzzyKeypath(key)) {
                 let match = matchKeypath(realpath, key)
                 if (match) {
                   addDifference(key, realpath, getOldValue(realpath), match)
@@ -401,15 +403,9 @@ export default class Observer {
     let {
       deps,
       reversedDeps,
-      valueCache,
     } = instance
 
     if (newDeps !== deps[ keypath ]) {
-
-      if (is.object(newDeps)) {
-        object.extend(valueCache, newDeps)
-        newDeps = object.keys(newDeps)
-      }
 
       deps[ keypath ] = newDeps
       updateWatchKeypaths(instance)
@@ -437,6 +433,10 @@ export default class Observer {
 
     }
 
+  }
+
+  setCache(keypath, value) {
+    this.cache[ keypath ] = value
   }
 
   /**
@@ -543,6 +543,7 @@ function createWatch(action) {
     let {
       emitter,
       context,
+      cache,
     } = instance
 
     object.each(
@@ -558,12 +559,16 @@ function createWatch(action) {
         emitter[ action ](keypath, watcher)
         updateWatchKeypaths(instance)
 
-        if (sync) {
-          execute(
-            watcher,
-            context,
-            [ instance.get(keypath), env.UNDEFINED, keypath ]
-          )
+        if (!isFuzzyKeypath(keypath)) {
+          // get 会缓存一下当前值，便于下次对比
+          value = instance.get(keypath)
+          if (sync) {
+            execute(
+              watcher,
+              context,
+              [ value, env.UNDEFINED, keypath ]
+            )
+          }
         }
 
       }
@@ -595,6 +600,16 @@ function matchKeypath(keypath, pattern) {
   if (match) {
     return array.toArray(match).slice(1)
   }
+}
+
+/**
+ * 是否模糊匹配
+ *
+ * @param {string} keypath
+ * @return {boolean}
+ */
+function isFuzzyKeypath(keypath) {
+  return string.has(keypath, '*')
 }
 
 /**
