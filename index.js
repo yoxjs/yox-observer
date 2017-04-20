@@ -341,24 +341,6 @@ export default class Observer {
         }
         emitter.fire(keypath, args, context)
 
-        if (watchKeypaths && !watchedMap[ realpath ]) {
-          watchedMap[ realpath ] = env.TRUE
-          array.each(
-            watchKeypaths,
-            function (key) {
-              if (string.has(key, '*')) {
-                let match = matchKeypath(realpath, key)
-                if (match) {
-                  addDifference(key, realpath, getOldValue(realpath), match)
-                }
-              }
-              else if (string.startsWith(key, realpath)) {
-                addDifference(key, realpath, getOldValue(realpath))
-              }
-            }
-          )
-        }
-
         if (reversedKeypaths && !reversedMap[ keypath ]) {
           reversedMap[ keypath ] = env.TRUE
           array.each(
@@ -381,6 +363,24 @@ export default class Observer {
                     addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
                   }
                 )
+              }
+            }
+          )
+        }
+
+        if (watchKeypaths && !watchedMap[ realpath ]) {
+          watchedMap[ realpath ] = env.TRUE
+          array.each(
+            watchKeypaths,
+            function (key) {
+              if (string.has(key, '*')) {
+                let match = matchKeypath(realpath, key)
+                if (match) {
+                  addDifference(key, realpath, getOldValue(realpath), match)
+                }
+              }
+              else if (string.startsWith(key, realpath)) {
+                addDifference(key, key, getOldValue(key))
               }
             }
           )
