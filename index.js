@@ -571,15 +571,19 @@ function createWatch(action) {
         updateWatchKeypaths(instance)
 
         if (!isFuzzyKeypath(keypath)) {
-          // get 会缓存一下当前值，便于下次对比
-          value = instance.get(keypath)
-          if (sync) {
-            execute(
-              watcher,
-              context,
-              [ value, env.UNDEFINED, keypath ]
-            )
-          }
+          nextTask.append(
+            function () {
+              // get 会缓存一下当前值，便于下次对比
+              value = instance.get(keypath)
+              if (sync) {
+                execute(
+                  watcher,
+                  context,
+                  [ value, env.UNDEFINED, keypath ]
+                )
+              }
+            }
+          )
         }
 
       }
