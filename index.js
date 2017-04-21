@@ -263,20 +263,6 @@ export default class Observer {
       reversedKeypaths,
     } = instance
 
-    let oldCache = { }, newCache = { }
-    let getOldValue = function (keypath) {
-      if (!object.has(oldCache, keypath)) {
-        oldCache[ keypath ] = cache[ keypath ]
-      }
-      return oldCache[ keypath ]
-    }
-    let getNewValue = function (keypath) {
-      if (!object.has(newCache, keypath)) {
-        newCache[ keypath ] = instance.get(keypath)
-      }
-      return newCache[ keypath ]
-    }
-
     let differences = [ ], differenceMap = { }
     let addDifference = function (keypath, realpath, oldValue, match, force) {
       let fullpath = keypath + char.CHAR_DASH + realpath
@@ -295,6 +281,20 @@ export default class Observer {
       }
     }
 
+    let oldCache = { }, newCache = { }
+    let getOldValue = function (keypath) {
+      if (!object.has(oldCache, keypath)) {
+        oldCache[ keypath ] = cache[ keypath ]
+      }
+      return oldCache[ keypath ]
+    }
+    let getNewValue = function (keypath) {
+      if (!object.has(newCache, keypath)) {
+        newCache[ keypath ] = instance.get(keypath)
+      }
+      return newCache[ keypath ]
+    }
+
     let watchedMap = { }
     let addWatchKeypath = function (keypath) {
       // 最后触发主动监听的 keypath，相当于捡漏
@@ -311,12 +311,12 @@ export default class Observer {
                 addDifference(key, keypath, getOldValue(keypath), match)
               }
             }
-            else if (string.startsWith(key, keypath)) {
+            else if (startsWith(key, keypath)) {
               addDifference(key, key, getOldValue(key))
             }
             // 为子组件传递数据，比如 user="{{user}}"
             // 修改了 user.name 并不会引起子组件更新
-            else if (string.startsWith(keypath, key)) {
+            else if (startsWith(keypath, key)) {
               addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
             }
           }
@@ -625,6 +625,20 @@ function matchKeypath(keypath, pattern) {
  */
 function isFuzzyKeypath(keypath) {
   return string.has(keypath, '*')
+}
+
+/**
+ * 是否以什么开始
+ *
+ * startsWith('user.name', 'user') 是 true
+ * startsWith('username', 'user') 为 false
+ *
+ * @param {string} keypath
+ * @param {string} prefix
+ * @return {boolean}
+ */
+function startsWith(keypath, prefix) {
+  return string.startsWith(keypath, prefix + keypathUtil.SEPARATOR_KEY)
 }
 
 /**
