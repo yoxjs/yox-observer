@@ -135,13 +135,10 @@ export default class Observer {
   /**
    * 获取数据
    *
-   * 当传了 context，会尝试向上寻找
-   *
    * @param {string} keypath
-   * @param {?string} context
    * @return {?*}
    */
-  get(keypath, context) {
+  get(keypath) {
 
     let instance = this
 
@@ -152,91 +149,36 @@ export default class Observer {
       computedGetters,
     } = instance
 
-    let getValue = function (keypath) {
-
-      if (computedStack) {
-        let list = array.last(computedStack)
-        if (list) {
-          array.push(list, keypath)
-        }
-      }
-
-      let result
-      if (computedGetters) {
-        let { getter, rest } = matchBestGetter(computedGetters, keypath)
-        if (getter) {
-          getter = getter()
-          result = rest && !is.primitive(getter)
-            ? object.get(getter, rest)
-            : { value: getter }
-        }
-      }
-
-      if (!result) {
-        result = object.get(data, keypath)
-      }
-
-      if (result) {
-        cache[ keypath ] = result.value
-      }
-
-      return result
-
+    if (!keypath) {
+      return data
     }
 
-    let suffixes = keypathUtil.parse(keypath), temp, result
+    keypath = keypathUtil.normalize(keypath)
 
-    if (is.string(context)) {
-      let prefixes = keypathUtil.parse(context)
-      if (suffixes.length > 1 && suffixes[ 0 ] === env.THIS) {
-        keypath = keypathUtil.stringify(
-          array.merge(
-            prefixes,
-            suffixes.slice(1)
-          )
-        )
-        result = getValue(keypath)
+    if (computedStack) {
+      let list = array.last(computedStack)
+      if (list) {
+        array.push(list, keypath)
       }
-      else {
-        keypath = env.NULL
-        while (env.TRUE) {
-          temp = keypathUtil.stringify(
-            array.merge(
-              prefixes,
-              suffixes
-            )
-          )
-          result = getValue(temp)
-          if (result) {
-            keypath = temp
-            break
-          }
-          else {
-            if (keypath == env.NULL) {
-              keypath = temp
-            }
-            if (!prefixes.length) {
-              break
-            }
-            else {
-              array.pop(prefixes)
-            }
-          }
-        }
-      }
-      if (!result) {
-        result = { }
-      }
-      result.keypath = keypath
-      return result
     }
-    else {
-      result = getValue(
-        keypathUtil.stringify(suffixes)
-      )
-      if (result) {
-        return result.value
+
+    let result
+    if (computedGetters) {
+      let { getter, rest } = matchBestGetter(computedGetters, keypath)
+      if (getter) {
+        getter = getter()
+        result = rest && !is.primitive(getter)
+          ? object.get(getter, rest)
+          : { value: getter }
       }
+    }
+
+    if (!result) {
+      result = object.get(data, keypath)
+    }
+
+    if (result) {
+      return cache[ keypath ] = result.value
     }
 
   }
