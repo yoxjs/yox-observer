@@ -8,7 +8,6 @@ import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
-import matchFirst from 'yox-common/function/matchFirst'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
@@ -579,18 +578,19 @@ function isFuzzyKeypath(keypath) {
  */
 function matchBestGetter(getters, keypath) {
 
-  let result = matchFirst(
+  let getter, rest
+
+  array.each(
     object.sort(getters, env.TRUE),
-    keypath
+    function (key) {
+      if (key = keypathUtil.startsWith(keypath, key, env.TRUE)) {
+        getter = getters[ key[ 0 ] ]
+        rest = key[ 1 ]
+        return env.FALSE
+      }
+    }
   )
 
-  let matched = result[ 0 ], rest = result[ 1 ]
-
-  return {
-    getter: matched ? getters[ matched ] : env.NULL,
-    rest: rest && string.startsWith(rest, keypathUtil.SEPARATOR_KEY)
-      ? string.slice(rest, 1)
-      : rest
-  }
+  return { getter, rest }
 
 }
