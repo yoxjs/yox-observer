@@ -255,11 +255,6 @@ export default class Observer {
             else if (keypathUtil.startsWith(key, keypath)) {
               addDifference(key, key, getOldValue(key))
             }
-            // 为子组件传递数据，比如 user="{{user}}"
-            // 修改了 user.name 并不会引起子组件更新
-            else if (keypathUtil.startsWith(keypath, key)) {
-              addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
-            }
           }
         )
       }
