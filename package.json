@@ -1,6 +1,6 @@
 {
   "name": "yox-observer",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,7 @@
     "test": "test"
   },
   "devDependencies": {
-    "yox-common": "^0.9.5"
+    "yox-common": "^0.9.7"
   },
   "repository": {
     "type": "git",
