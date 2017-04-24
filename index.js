@@ -82,14 +82,16 @@ export default class Observer {
 
           if (get) {
 
-            instance.watch(
-              keypath,
-              function () {
-                if (object.has(cache, keypath)) {
-                  delete cache[ keypath ]
+            if (cacheable) {
+              instance.watch(
+                keypath,
+                function () {
+                  if (object.has(cache, keypath)) {
+                    delete cache[ keypath ]
+                  }
                 }
-              }
-            )
+              )
+            }
 
             let getter = function () {
               if (cacheable && object.has(cache, keypath)) {
@@ -204,6 +206,20 @@ export default class Observer {
       reversedKeypaths,
     } = instance
 
+
+    /**
+     * a -> b -> c
+     *
+     * a 依赖 b，b 依赖 c
+     *
+     * 当修改 c 时，要通知 a 和 b 更新
+     * 当修改 b 时，要通知 a 更新，不通知 c 更新
+     * 当修改 a 时，仅自己更新
+     *
+     * 当监听 user.* 时，如果修改了 user.name，不仅要触发 user.name 的 watcher，也要触发 user.* 的 watcher
+     *
+     */
+
     let differences = [ ], differenceMap = { }
     let addDifference = function (keypath, realpath, oldValue, match, force) {
       let fullpath = keypath + char.CHAR_DASH + realpath
@@ -219,6 +235,7 @@ export default class Observer {
             force,
           }
         )
+        addWatchKeypath(keypath)
       }
     }
 
@@ -297,7 +314,6 @@ export default class Observer {
         keypath = keypathUtil.normalize(keypath)
 
         addDifference(keypath, keypath, getOldValue(keypath))
-        addWatchKeypath(keypath)
 
         // 如果有计算属性，则优先处理它
         if (computedSetters) {
@@ -325,7 +341,7 @@ export default class Observer {
     )
 
 
-    let fireChange = function ({ keypath, realpath, oldValue, match, force }) {
+    let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
       let newValue = getNewValue(realpath)
       if (force || oldValue !== newValue) {
         let args = [ newValue, oldValue, keypath ]
@@ -334,12 +350,11 @@ export default class Observer {
         }
         emitter.fire(keypath, args, context)
         addReversedKeypath(keypath)
-        addWatchKeypath(realpath)
       }
     }
 
     for (let i = 0; i < differences.length; i++) {
-      fireChange(differences[ i ])
+      fireDifference(differences[ i ])
     }
 
   }
@@ -491,7 +506,6 @@ function createWatch(action) {
     let {
       emitter,
       context,
-      cache,
     } = instance
 
     object.each(
