@@ -66,11 +66,11 @@ export default class Observer {
             get = item
           }
           else if (is.object(item)) {
+            if (item.deps) {
+              deps = item.deps
+            }
             if (is.boolean(item.cache)) {
               cacheable = item.cache
-            }
-            if (is.array(item.deps)) {
-              deps = item.deps
             }
             if (is.func(item.get)) {
               get = item.get
@@ -84,18 +84,22 @@ export default class Observer {
 
             if (cacheable) {
               instance.watch(
-                keypath,
+                keypath + FORCE,
                 function () {
-                  if (object.has(cache, keypath)) {
-                    delete cache[ keypath ]
-                  }
+                  getter[ DIRTY ] = env.TRUE
                 }
               )
             }
 
             let getter = function () {
-              if (cacheable && object.has(cache, keypath)) {
-                return cache[ keypath ]
+
+              if (cacheable) {
+                if (getter[ DIRTY ]) {
+                  delete getter[ DIRTY ]
+                }
+                else if (object.has(cache, keypath)) {
+                  return cache[ keypath ]
+                }
               }
 
               if (!deps) {
@@ -105,10 +109,10 @@ export default class Observer {
               let result = execute(get, instance.context)
               cache[ keypath ] = result
 
-              instance.setDeps(
-                keypath,
-                deps || array.pop(computedStack)
-              )
+              let newDeps = deps || array.pop(computedStack)
+              if (is.array(newDeps)) {
+                instance.setDeps(keypath, newDeps)
+              }
 
               return result
 
@@ -165,12 +169,12 @@ export default class Observer {
 
     let result
     if (computedGetters) {
-      let { getter, rest } = matchBestGetter(computedGetters, keypath)
-      if (getter) {
-        getter = getter()
-        result = rest && !is.primitive(getter)
-          ? object.get(getter, rest)
-          : { value: getter }
+      let { value, rest } = matchBestGetter(computedGetters, keypath)
+      if (value) {
+        value = value()
+        result = rest && !is.primitive(value)
+          ? object.get(value, rest)
+          : { value }
       }
     }
 
@@ -298,11 +302,11 @@ export default class Observer {
             return
           }
           else {
-            let { prefix, getter, rest } = matchBestGetter(computedGetters, keypath)
-            if (getter && rest) {
-              getter = getter()
-              if (!is.primitive(getter)) {
-                object.set(getter, rest, newValue)
+            let { value, rest } = matchBestGetter(computedGetters, keypath)
+            if (value && rest) {
+              value = value()
+              if (!is.primitive(value)) {
+                object.set(value, rest, newValue)
               }
               return
             }
@@ -323,9 +327,14 @@ export default class Observer {
         if (match) {
           array.push(args, match)
         }
-        emitter.fire(keypath, args, context)
+        emitter.fire(keypath + (force ? FORCE : char.CHAR_BLANK), args, context)
 
-        if (getNewValue(realpath) !== oldValue) {
+        newValue = getNewValue(realpath)
+        if (newValue !== oldValue) {
+          if (force) {
+            args[ 0 ] = newValue
+            emitter.fire(keypath, args, context)
+          }
           array.each(
             watchKeypaths,
             function (key) {
@@ -441,6 +450,9 @@ object.extend(
 
   }
 )
+
+const FORCE = '._force_'
+const DIRTY = '_dirty_'
 
 function updateWatchKeypaths(instance) {
 
@@ -581,20 +593,20 @@ function isFuzzyKeypath(keypath) {
  */
 function matchBestGetter(getters, keypath) {
 
-  let prefix, getter, rest
+  let key, value, rest
 
   array.each(
     object.sort(getters, env.TRUE),
-    function (key) {
-      if (key = keypathUtil.startsWith(keypath, key, env.TRUE)) {
-        prefix = key[ 0 ]
-        getter = getters[ prefix ]
-        rest = key[ 1 ]
+    function (prefix) {
+      if (prefix = keypathUtil.startsWith(keypath, prefix, env.TRUE)) {
+        key = prefix[ 0 ]
+        value = getters[ key ]
+        rest = prefix[ 1 ]
         return env.FALSE
       }
     }
   )
 
-  return { prefix, getter, rest }
+  return { key, value, rest }
 
 }
