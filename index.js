@@ -218,6 +218,7 @@ export default class Observer {
      *
      * 当监听 user.* 时，如果修改了 user.name，不仅要触发 user.name 的 watcher，也要触发 user.* 的 watcher
      *
+     * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
      */
 
     let differences = [ ], differenceMap = { }
@@ -235,7 +236,6 @@ export default class Observer {
             force,
           }
         )
-        addWatchKeypath(keypath)
       }
     }
 
@@ -253,34 +253,10 @@ export default class Observer {
       return newCache[ keypath ]
     }
 
-    let watchedMap = { }
-    let addWatchKeypath = function (keypath) {
-      // 最后触发主动监听的 keypath，相当于捡漏
-      // 比如修改了 user 但是 watch 了 user.name
-      // 这时需要确保 user.name 也能触发变化
-      if (watchKeypaths && !watchedMap[ keypath ]) {
-        watchedMap[ keypath ] = env.TRUE
-        array.each(
-          watchKeypaths,
-          function (key) {
-            if (isFuzzyKeypath(key)) {
-              let match = matchKeypath(keypath, key)
-              if (match) {
-                addDifference(key, keypath, getOldValue(keypath), match)
-              }
-            }
-            else if (keypathUtil.startsWith(key, keypath)) {
-              addDifference(key, key, getOldValue(key))
-            }
-          }
-        )
-      }
-    }
-
-    let reversedMap = { }
-    let addReversedKeypath = function (keypath) {
-      if (reversedKeypaths && !reversedMap[ keypath ]) {
-        reversedMap[ keypath ] = env.TRUE
+    let reversedDepMap = { }
+    let addReversedDepKeypath = function (keypath) {
+      if (reversedKeypaths && !reversedDepMap[ keypath ]) {
+        reversedDepMap[ keypath ] = env.TRUE
         array.each(
           reversedKeypaths,
           function (key) {
@@ -315,7 +291,6 @@ export default class Observer {
 
         addDifference(keypath, keypath, getOldValue(keypath))
 
-        // 如果有计算属性，则优先处理它
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
           if (setter) {
@@ -323,7 +298,7 @@ export default class Observer {
             return
           }
           else {
-            let { getter, rest } = matchBestGetter(computedGetters, keypath)
+            let { prefix, getter, rest } = matchBestGetter(computedGetters, keypath)
             if (getter && rest) {
               getter = getter()
               if (!is.primitive(getter)) {
@@ -334,22 +309,41 @@ export default class Observer {
           }
         }
 
-        // 普通数据
         object.set(data, keypath, newValue)
 
       }
     )
 
-
     let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
-      let newValue = getNewValue(realpath)
-      if (force || oldValue !== newValue) {
+
+      let newValue = force ? oldValue : getNewValue(realpath)
+      if (force || newValue !== oldValue) {
+
         let args = [ newValue, oldValue, keypath ]
         if (match) {
           array.push(args, match)
         }
         emitter.fire(keypath, args, context)
-        addReversedKeypath(keypath)
+
+        if (getNewValue(realpath) !== oldValue) {
+          array.each(
+            watchKeypaths,
+            function (key) {
+              if (key !== realpath) {
+                if (isFuzzyKeypath(key)) {
+                  let match = matchKeypath(realpath, key)
+                  if (match) {
+                    addDifference(key, realpath, getOldValue(realpath), match)
+                  }
+                }
+                else if (keypathUtil.startsWith(key, realpath)) {
+                  addDifference(key, key, getOldValue(key))
+                }
+              }
+            }
+          )
+          addReversedDepKeypath(realpath)
+        }
       }
     }
 
@@ -392,7 +386,7 @@ export default class Observer {
       )
 
       instance.reversedDeps = reversedDeps
-      instance.reversedKeypaths = object.keys(reversedDeps)
+      instance.reversedKeypaths = object.sort(reversedDeps, env.TRUE)
 
     }
 
@@ -480,7 +474,7 @@ function updateWatchKeypaths(instance) {
     }
   )
 
-  instance.watchKeypaths = object.keys(watchKeypaths)
+  instance.watchKeypaths = object.sort(watchKeypaths, env.TRUE)
 
 }
 
@@ -587,19 +581,20 @@ function isFuzzyKeypath(keypath) {
  */
 function matchBestGetter(getters, keypath) {
 
-  let getter, rest
+  let prefix, getter, rest
 
   array.each(
     object.sort(getters, env.TRUE),
     function (key) {
       if (key = keypathUtil.startsWith(keypath, key, env.TRUE)) {
-        getter = getters[ key[ 0 ] ]
+        prefix = key[ 0 ]
+        getter = getters[ prefix ]
         rest = key[ 1 ]
         return env.FALSE
       }
     }
   )
 
-  return { getter, rest }
+  return { prefix, getter, rest }
 
 }
