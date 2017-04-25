@@ -202,7 +202,6 @@ export default class Observer {
       cache,
       emitter,
       context,
-      deps,
       reversedDeps,
       computedGetters,
       computedSetters,
@@ -340,9 +339,11 @@ export default class Observer {
             function (key) {
               if (key !== realpath) {
                 if (isFuzzyKeypath(key)) {
-                  let match = matchKeypath(realpath, key)
-                  if (match) {
-                    addDifference(key, realpath, getOldValue(realpath), match)
+                  if (!string.has(realpath, FORCE)) {
+                    let match = matchKeypath(realpath, key)
+                    if (match) {
+                      addDifference(key, realpath, getOldValue(realpath), match)
+                    }
                   }
                 }
                 else if (keypathUtil.startsWith(key, realpath)) {
