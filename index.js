@@ -141,9 +141,10 @@ export default class Observer {
    * 获取数据
    *
    * @param {string} keypath
+   * @param {*} defaultValue
    * @return {?*}
    */
-  get(keypath) {
+  get(keypath, defaultValue) {
 
     let instance = this
 
@@ -182,9 +183,9 @@ export default class Observer {
       result = object.get(data, keypath)
     }
 
-    if (result) {
-      return cache[ keypath ] = result.value
-    }
+    return result
+      ? (cache[ keypath ] = result.value)
+      : defaultValue
 
   }
 
