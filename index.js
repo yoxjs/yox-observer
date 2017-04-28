@@ -95,7 +95,7 @@ export default class Observer {
 
               if (cacheable) {
                 if (getter[ DIRTY ]) {
-                  delete getter[ DIRTY ]
+                  getter[ DIRTY ] = env.FALSE
                 }
                 else if (object.has(cache, keypath)) {
                   return cache[ keypath ]
@@ -355,6 +355,10 @@ export default class Observer {
           )
           addReversedDepKeypath(realpath)
         }
+      }
+      else if (is.array(newValue)) {
+        realpath = keypathUtil.join(realpath, 'length')
+        addDifference(realpath, realpath, getOldValue(realpath))
       }
     }
 
