@@ -220,6 +220,8 @@ export default class Observer {
      * 当修改 b 时，要通知 a 更新，不通知 c 更新
      * 当修改 a 时，仅自己更新
      *
+     * 有时候，b 的数据来自 c 的过滤，当修改 b 时，实际是修改 c，这时候，应该从最深层开始往上通知
+     *
      * 当监听 user.* 时，如果修改了 user.name，不仅要触发 user.name 的 watcher，也要触发 user.* 的 watcher
      *
      * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
@@ -318,6 +320,8 @@ export default class Observer {
       }
     )
 
+    let nextDifferences = [ ]
+
     let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
 
       let newValue = force ? oldValue : getNewValue(realpath)
@@ -327,7 +331,12 @@ export default class Observer {
         if (match) {
           array.push(args, match)
         }
-        emitter.fire(keypath + (force ? FORCE : char.CHAR_BLANK), args, context)
+        if (force) {
+          emitter.fire(keypath + FORCE, args, context)
+        }
+        else {
+          nextDifferences.push(args)
+        }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
@@ -364,6 +373,26 @@ export default class Observer {
 
     for (let i = 0; i < differences.length; i++) {
       fireDifference(differences[ i ])
+    }
+
+    if (nextDifferences.length) {
+      nextTask.append(
+        function () {
+          if (instance.deps) {
+            array.each(
+              nextDifferences,
+              function (difference) {
+                let keypath = difference[ 3 ] || difference[ 2 ]
+                let newValue = instance.get(keypath)
+                if (difference[ 1 ] !== newValue) {
+                  difference[ 0 ] = newValue
+                  emitter.fire(difference[ 2 ], difference, context)
+                }
+              }
+            )
+          }
+        }
+      )
     }
 
   }
@@ -536,14 +565,16 @@ function createWatch(action) {
         if (!isFuzzyKeypath(keypath)) {
           nextTask.append(
             function () {
-              // get 会缓存一下当前值，便于下次对比
-              value = instance.get(keypath)
-              if (sync) {
-                execute(
-                  watcher,
-                  context,
-                  [ value, env.UNDEFINED, keypath ]
-                )
+              if (instance.deps) {
+                // get 会缓存一下当前值，便于下次对比
+                value = instance.get(keypath)
+                if (sync) {
+                  execute(
+                    watcher,
+                    context,
+                    [ value, env.UNDEFINED, keypath ]
+                  )
+                }
               }
             }
           )
