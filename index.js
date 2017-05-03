@@ -227,9 +227,13 @@ export default class Observer {
      * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
      */
 
+    let joinKeypath = function (keypath1, keypath2) {
+      return keypath1 + char.CHAR_DASH + keypath2
+    }
+
     let differences = [ ], differenceMap = { }
     let addDifference = function (keypath, realpath, oldValue, match, force) {
-      let fullpath = keypath + char.CHAR_DASH + realpath
+      let fullpath = joinKeypath(keypath, realpath)
       if (!differenceMap[ fullpath ]) {
         differenceMap[ fullpath ] = env.TRUE
         array.push(
@@ -320,7 +324,44 @@ export default class Observer {
       }
     )
 
-    let result = [ ]
+    let addAsyncDifference = function (keypath, realpath, oldValue) {
+
+      let differences = instance.differences || (instance.differences = { })
+      differences[ joinKeypath(keypath, realpath) ] = {
+        keypath,
+        realpath,
+        oldValue,
+      }
+
+      if (!instance.pending) {
+        instance.pending = env.TRUE
+        nextTask.append(
+          function () {
+            if (instance.pending) {
+              // 冻结这批变化
+              // 避免 fire 之后同步再次走进这里
+              let { differences } = instance
+              delete instance.pending
+              delete instance.differences
+              object.each(
+                differences,
+                function (difference) {
+                  let { keypath, realpath, oldValue } = difference, newValue = instance.get(realpath)
+                  if (oldValue !== newValue) {
+                    let args = [ newValue, oldValue, keypath ]
+                    if (realpath !== keypath) {
+                      array.push(args, realpath)
+                    }
+                    emitter.fire(keypath, args, context)
+                  }
+                }
+              )
+            }
+          }
+        )
+      }
+
+    }
 
     let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
 
@@ -335,14 +376,18 @@ export default class Observer {
           emitter.fire(keypath + FORCE, args, context)
         }
         else {
-          result.push(args)
+          if (string.has(keypath, FORCE)) {
+            emitter.fire(keypath, args, context)
+          }
+          else {
+            addAsyncDifference(keypath, realpath, oldValue)
+          }
         }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
           if (force) {
-            args[ 0 ] = newValue
-            result.push(args)
+            addAsyncDifference(keypath, realpath, oldValue)
           }
           array.each(
             watchKeypaths,
@@ -374,8 +419,6 @@ export default class Observer {
     for (let i = 0; i < differences.length; i++) {
       fireDifference(differences[ i ])
     }
-
-    return result
 
   }
 
