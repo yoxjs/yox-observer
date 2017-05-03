@@ -320,7 +320,7 @@ export default class Observer {
       }
     )
 
-    let nextDifferences = [ ]
+    let result = [ ]
 
     let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
 
@@ -335,14 +335,14 @@ export default class Observer {
           emitter.fire(keypath + FORCE, args, context)
         }
         else {
-          nextDifferences.push(args)
+          result.push(args)
         }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
           if (force) {
             args[ 0 ] = newValue
-            emitter.fire(keypath, args, context)
+            result.push(args)
           }
           array.each(
             watchKeypaths,
@@ -375,25 +375,7 @@ export default class Observer {
       fireDifference(differences[ i ])
     }
 
-    if (nextDifferences.length) {
-      nextTask.append(
-        function () {
-          if (instance.deps) {
-            array.each(
-              nextDifferences,
-              function (difference) {
-                let keypath = difference[ 3 ] || difference[ 2 ]
-                let newValue = instance.get(keypath)
-                if (difference[ 1 ] !== newValue) {
-                  difference[ 0 ] = newValue
-                  emitter.fire(difference[ 2 ], difference, context)
-                }
-              }
-            )
-          }
-        }
-      )
-    }
+    return result
 
   }
 
