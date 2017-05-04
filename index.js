@@ -324,7 +324,7 @@ export default class Observer {
       }
     )
 
-    let addAsyncDifference = function (keypath, realpath, oldValue) {
+    let fireAsync = function (keypath, realpath, oldValue) {
 
       let differences = instance.differences || (instance.differences = { })
       differences[ joinKeypath(keypath, realpath) ] = {
@@ -332,6 +332,15 @@ export default class Observer {
         realpath,
         oldValue,
       }
+
+      object.each(
+        cache,
+        function (value, key) {
+          if (key !== realpath && keypathUtil.startsWith(key, realpath)) {
+            delete cache[ key ]
+          }
+        }
+      )
 
       if (!instance.pending) {
         instance.pending = env.TRUE
@@ -349,7 +358,7 @@ export default class Observer {
                   let { keypath, realpath, oldValue } = difference, newValue = instance.get(realpath)
                   if (oldValue !== newValue) {
                     let args = [ newValue, oldValue, keypath ]
-                    if (realpath !== keypath) {
+                    if (realpath && realpath !== keypath) {
                       array.push(args, realpath)
                     }
                     emitter.fire(keypath, args, context)
@@ -380,14 +389,14 @@ export default class Observer {
             emitter.fire(keypath, args, context)
           }
           else {
-            addAsyncDifference(keypath, realpath, oldValue)
+            fireAsync(keypath, realpath, oldValue)
           }
         }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
           if (force) {
-            addAsyncDifference(keypath, realpath, oldValue)
+            fireAsync(keypath, realpath, oldValue)
           }
           array.each(
             watchKeypaths,
@@ -401,7 +410,7 @@ export default class Observer {
                     }
                   }
                 }
-                else if (keypathUtil.startsWith(key, realpath)) {
+                else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
                   addDifference(key, key, getOldValue(key))
                 }
               }
@@ -665,10 +674,11 @@ function matchBestGetter(getters, keypath) {
   array.each(
     object.sort(getters, env.TRUE),
     function (prefix) {
-      if (prefix = keypathUtil.startsWith(keypath, prefix, env.TRUE)) {
-        key = prefix[ 0 ]
+      let length = keypathUtil.startsWith(keypath, prefix)
+      if (length !== env.FALSE) {
+        key = prefix
         value = getters[ key ]
-        rest = prefix[ 1 ]
+        rest = string.slice(keypath, length)
         return env.FALSE
       }
     }
