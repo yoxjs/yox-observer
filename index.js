@@ -598,11 +598,11 @@ function createWatch(action) {
             }
             nextTask.append(
               function () {
-                if (instance.deps || !watcher[ syncKey ]) {
+                if (instance.deps && !watcher[ syncKey ]) {
                   execute(
                     watcher,
                     context,
-                    [ value, env.UNDEFINED, keypath ]
+                    [ instance.get(keypath), value, keypath ]
                   )
                 }
               }
