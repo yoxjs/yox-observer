@@ -588,7 +588,7 @@ function createWatch(action) {
         updateWatchKeypaths(instance)
 
         if (!isFuzzyKeypath(keypath)) {
-          nextTask.append(
+          nextTask.prepend(
             function () {
               if (instance.deps) {
                 // get 会缓存一下当前值，便于下次对比
