@@ -588,12 +588,17 @@ function createWatch(action) {
         updateWatchKeypaths(instance)
 
         if (!isFuzzyKeypath(keypath)) {
-          nextTask.prepend(
-            function () {
-              if (instance.deps) {
-                // get 会缓存一下当前值，便于下次对比
-                value = instance.get(keypath)
-                if (sync) {
+          // 既然是 watch, 就先通过 get 缓存当前值，便于下次对比
+          value = instance.get(keypath)
+          // 立即执行，通过 Emitter 提供的 $magic 扩展实现
+          if (sync) {
+            let syncKey = `sync-${keypath}`
+            watcher.$magic = function () {
+              watcher[ syncKey ] = env.TRUE
+            }
+            nextTask.append(
+              function () {
+                if (instance.deps || !watcher[ syncKey ]) {
                   execute(
                     watcher,
                     context,
@@ -601,8 +606,8 @@ function createWatch(action) {
                   )
                 }
               }
-            }
-          )
+            )
+          }
         }
 
       }
