@@ -106,15 +106,15 @@ export default class Observer {
                 computedStack.push([ ])
               }
 
-              let result = execute(get, instance.context)
-              cache[ keypath ] = result
+              let value = execute(get, instance.context)
+              cache[ keypath ] = value
 
               let newDeps = deps || array.pop(computedStack)
               if (is.array(newDeps)) {
                 instance.setDeps(keypath, newDeps)
               }
 
-              return result
+              return value
 
             }
 
@@ -146,7 +146,7 @@ export default class Observer {
    */
   get(keypath, defaultValue) {
 
-    let instance = this
+    let instance = this, result
 
     let {
       data,
@@ -155,7 +155,7 @@ export default class Observer {
       computedGetters,
     } = instance
 
-    if (!keypath) {
+    if (keypath === char.CHAR_BLANK) {
       return data
     }
 
@@ -168,7 +168,6 @@ export default class Observer {
       }
     }
 
-    let result
     if (computedGetters) {
       let { value, rest } = matchBestGetter(computedGetters, keypath)
       if (value) {
@@ -209,7 +208,6 @@ export default class Observer {
       watchKeypaths,
       reversedKeypaths,
     } = instance
-
 
     /**
      * a -> b -> c
