@@ -225,28 +225,6 @@ export default class Observer {
      * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
      */
 
-    let joinKeypath = function (keypath1, keypath2) {
-      return keypath1 + char.CHAR_DASH + keypath2
-    }
-
-    let differences = [ ], differenceMap = { }
-    let addDifference = function (keypath, realpath, oldValue, match, force) {
-      let fullpath = joinKeypath(keypath, realpath)
-      if (!differenceMap[ fullpath ]) {
-        differenceMap[ fullpath ] = env.TRUE
-        array.push(
-          differences,
-          {
-            keypath,
-            realpath,
-            oldValue,
-            match,
-            force,
-          }
-        )
-      }
-    }
-
     let oldCache = { }, newCache = { }
     let getOldValue = function (keypath) {
       if (!object.has(oldCache, keypath)) {
@@ -261,31 +239,23 @@ export default class Observer {
       return newCache[ keypath ]
     }
 
-    let reversedDepMap = { }
-    let addReversedDepKeypath = function (keypath) {
-      if (reversedKeypaths && !reversedDepMap[ keypath ]) {
-        reversedDepMap[ keypath ] = env.TRUE
-        array.each(
-          reversedKeypaths,
-          function (key) {
-            let list, match
-            if (key === keypath) {
-              list = reversedDeps[ key ]
-            }
-            else if (isFuzzyKeypath(key)) {
-              match = matchKeypath(keypath, key)
-              if (match) {
-                list = reversedDeps[ key ]
-              }
-            }
-            if (list) {
-              array.each(
-                list,
-                function (key) {
-                  addDifference(key, key, getOldValue(key), env.UNDEFINED, env.TRUE)
-                }
-              )
-            }
+    let joinKeypath = function (keypath1, keypath2) {
+      return keypath1 + char.CHAR_DASH + keypath2
+    }
+
+    let differences = [ ], differenceMap = { }
+    let addDifference = function (keypath, realpath, match, force) {
+      let fullpath = joinKeypath(keypath, realpath)
+      if (!differenceMap[ fullpath ]) {
+        differenceMap[ fullpath ] = env.TRUE
+        array.push(
+          differences,
+          {
+            keypath,
+            realpath,
+            match,
+            force,
+            oldValue: getOldValue(realpath),
           }
         )
       }
@@ -297,7 +267,7 @@ export default class Observer {
 
         keypath = keypathUtil.normalize(keypath)
 
-        addDifference(keypath, keypath, getOldValue(keypath))
+        addDifference(keypath, keypath)
 
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
@@ -322,14 +292,10 @@ export default class Observer {
       }
     )
 
-    let fireAsync = function (keypath, realpath, oldValue) {
+    let fireDifference = function (keypath, realpath, oldValue) {
 
       let differences = instance.differences || (instance.differences = { })
-      differences[ joinKeypath(keypath, realpath) ] = {
-        keypath,
-        realpath,
-        oldValue,
-      }
+      differences[ joinKeypath(keypath, realpath) ] = { keypath, realpath, oldValue }
 
       object.each(
         cache,
@@ -370,8 +336,8 @@ export default class Observer {
 
     }
 
-    let fireDifference = function ({ keypath, realpath, oldValue, match, force }) {
-
+    for (let i = 0, difference; i < differences.length; i++) {
+      let { keypath, realpath, oldValue, match, force } = differences[ i ]
       let newValue = force ? oldValue : getNewValue(realpath)
       if (force || newValue !== oldValue) {
 
@@ -385,46 +351,72 @@ export default class Observer {
         else {
           if (string.has(keypath, FORCE)) {
             emitter.fire(keypath, args, context)
+            break
           }
           else {
-            fireAsync(keypath, realpath, oldValue)
+            fireDifference(keypath, realpath, oldValue)
           }
         }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
+
           if (force) {
-            fireAsync(keypath, realpath, oldValue)
+            fireDifference(keypath, realpath, oldValue)
           }
+
+          // 当 user.name 变化了
+          // 要通知 user.* 的观察者们
           array.each(
             watchKeypaths,
             function (key) {
               if (key !== realpath) {
                 if (isFuzzyKeypath(key)) {
-                  if (!string.has(realpath, FORCE)) {
-                    let match = matchKeypath(realpath, key)
-                    if (match) {
-                      addDifference(key, realpath, getOldValue(realpath), match)
-                    }
+                  let match = matchKeypath(realpath, key)
+                  if (match) {
+                    addDifference(key, realpath, match)
                   }
                 }
                 else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
-                  addDifference(key, key, getOldValue(key))
+                  addDifference(key, key)
                 }
               }
             }
           )
-          addReversedDepKeypath(realpath)
+
+          // a 依赖 b
+          // 当 b 变化了，要通知 a
+          array.each(
+            reversedKeypaths,
+            function (key) {
+              let list
+              if (isFuzzyKeypath(key)) {
+                let match = matchKeypath(realpath, key)
+                if (match) {
+                  list = reversedDeps[ key ]
+                }
+              }
+              else if (key === realpath) {
+                list = reversedDeps[ key ]
+              }
+              if (list) {
+                array.each(
+                  list,
+                  function (key) {
+                    addDifference(key, key, env.UNDEFINED, env.TRUE)
+                  }
+                )
+              }
+            }
+          )
+
         }
       }
       else if (is.array(newValue)) {
         realpath = keypathUtil.join(realpath, 'length')
-        addDifference(realpath, realpath, getOldValue(realpath))
+        addDifference(realpath, realpath)
       }
-    }
 
-    for (let i = 0; i < differences.length; i++) {
-      fireDifference(differences[ i ])
     }
 
   }
@@ -435,7 +427,6 @@ export default class Observer {
 
     let {
       deps,
-      reversedDeps,
     } = instance
 
     if (newDeps !== deps[ keypath ]) {
@@ -443,8 +434,7 @@ export default class Observer {
       deps[ keypath ] = newDeps
       updateWatchKeypaths(instance)
 
-      // 全量更新
-      reversedDeps = { }
+      let reversedDeps = { }
 
       object.each(
         deps,
@@ -511,8 +501,9 @@ object.extend(
      * @param {?Function} watcher
      */
     unwatch: function (keypath, watcher) {
-      this.emitter.off(keypath, watcher)
-      updateWatchKeypaths(this)
+      if (this.emitter.off(keypath, watcher)) {
+        updateWatchKeypaths(this)
+      }
     }
 
   }
@@ -521,12 +512,9 @@ object.extend(
 const FORCE = '._force_'
 const DIRTY = '_dirty_'
 
-function updateWatchKeypaths(instance) {
+let syncIndex = 0
 
-  let {
-    deps,
-    emitter,
-  } = instance
+function updateWatchKeypaths(instance) {
 
   let watchKeypaths = { }
 
@@ -536,15 +524,15 @@ function updateWatchKeypaths(instance) {
 
   // 1. 直接通过 watch 注册的
   object.each(
-    emitter.listeners,
+    instance.emitter.listeners,
     function (list, key) {
       addKeypath(key)
     }
   )
 
-  // 2. 计算属性的依赖属于间接 watch
+  // 2. 依赖属于间接 watch
   object.each(
-    deps,
+    instance.deps,
     function (deps) {
       array.each(
         deps,
@@ -568,18 +556,10 @@ function createWatch(action) {
     let watchers = keypath
     if (is.string(keypath)) {
       watchers = { }
-      watchers[ keypath ] = {
-        sync,
-        watcher,
-      }
+      watchers[ keypath ] = { sync, watcher }
     }
 
     let instance = this
-
-    let {
-      emitter,
-      context,
-    } = instance
 
     object.each(
       watchers,
@@ -591,24 +571,29 @@ function createWatch(action) {
           sync = value.sync
         }
 
-        emitter[ action ](keypath, watcher)
-        updateWatchKeypaths(instance)
+        if (instance.emitter[ action ](keypath, watcher)) {
+          updateWatchKeypaths(instance)
+        }
 
         if (!isFuzzyKeypath(keypath)) {
           // 既然是 watch, 就先通过 get 缓存当前值，便于下次对比
           value = instance.get(keypath)
           // 立即执行，通过 Emitter 提供的 $magic 扩展实现
           if (sync) {
-            let syncKey = `sync-${keypath}`
+            let syncKey = `sync-${syncIndex++}`
             watcher.$magic = function () {
               watcher[ syncKey ] = env.TRUE
+              delete watcher.$magic
             }
             nextTask.append(
               function () {
-                if (instance.deps && !watcher[ syncKey ]) {
+                if (watcher[ syncKey ]) {
+                  delete watcher[ syncKey ]
+                }
+                else if (instance.context) {
                   execute(
                     watcher,
-                    context,
+                    instance.context,
                     [ instance.get(keypath), value, keypath ]
                   )
                 }
@@ -632,6 +617,7 @@ let patternCache = { }
  *
  * @param {string} keypath
  * @param {string} pattern
+ * return {?Array.<string>}
  */
 function matchKeypath(keypath, pattern) {
   let cache = patternCache[ pattern ]
@@ -675,7 +661,7 @@ function matchBestGetter(getters, keypath) {
       let length = keypathUtil.startsWith(keypath, prefix)
       if (length !== env.FALSE) {
         key = prefix
-        value = getters[ key ]
+        value = getters[ prefix ]
         rest = string.slice(keypath, length)
         return env.FALSE
       }
