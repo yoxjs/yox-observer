@@ -118,7 +118,6 @@ export default class Observer {
 
             }
 
-            getter.toString =
             instance.computedGetters[ keypath ] = getter
 
           }
