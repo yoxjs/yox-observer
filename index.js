@@ -197,6 +197,7 @@ export default class Observer {
     let instance = this
 
     let {
+      deps,
       data,
       cache,
       syncing,
@@ -210,8 +211,43 @@ export default class Observer {
     } = instance
 
     if (syncing) {
+
       delete instance.syncing
-      updateWatchKeypaths(instance)
+
+      watchKeypaths = { }
+      reversedDeps = { }
+
+      let addKeypath = function (keypath) {
+        watchKeypaths[ keypath ] = env.TRUE
+      }
+
+      object.each(
+        emitter.listeners,
+        function (list, key) {
+          addKeypath(key)
+        }
+      )
+
+      object.each(
+        deps,
+        function (deps, key) {
+          array.each(
+            deps,
+            function (dep) {
+              addKeypath(dep)
+              array.push(
+                reversedDeps[ dep ] || (reversedDeps[ dep ] = [ ]),
+                key
+              )
+            }
+          )
+        }
+      )
+
+      reversedDeps = instance.reversedDeps = reversedDeps
+      watchKeypaths = instance.watchKeypaths = object.sort(watchKeypaths, env.TRUE)
+      reversedKeypaths = instance.reversedKeypaths = object.sort(reversedDeps, env.TRUE)
+
     }
 
     /**
@@ -435,36 +471,11 @@ export default class Observer {
   setDeps(keypath, newDeps) {
 
     let instance = this
-
-    let {
-      deps,
-    } = instance
+    let { deps } = instance
 
     if (newDeps !== deps[ keypath ]) {
-
       deps[ keypath ] = newDeps
       instance.syncing = env.TRUE
-
-      let reversedDeps = { }
-
-      object.each(
-        deps,
-        function (deps, key) {
-          array.each(
-            deps,
-            function (dep) {
-              array.push(
-                reversedDeps[ dep ] || (reversedDeps[ dep ] = [ ]),
-                key
-              )
-            }
-          )
-        }
-      )
-
-      instance.reversedDeps = reversedDeps
-      instance.reversedKeypaths = object.sort(reversedDeps, env.TRUE)
-
     }
 
   }
@@ -524,37 +535,6 @@ const FORCE = '._force_'
 const DIRTY = '_dirty_'
 
 let syncIndex = 0
-
-function updateWatchKeypaths(instance) {
-
-  let watchKeypaths = { }
-
-  let addKeypath = function (keypath) {
-    watchKeypaths[ keypath ] = env.TRUE
-  }
-
-  // 1. 直接通过 watch 注册的
-  object.each(
-    instance.emitter.listeners,
-    function (list, key) {
-      addKeypath(key)
-    }
-  )
-
-  // 2. 依赖属于间接 watch
-  object.each(
-    instance.deps,
-    function (deps) {
-      array.each(
-        deps,
-        addKeypath
-      )
-    }
-  )
-
-  instance.watchKeypaths = object.sort(watchKeypaths, env.TRUE)
-
-}
 
 /**
  * watch 和 watchOnce 逻辑相同
