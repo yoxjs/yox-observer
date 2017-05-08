@@ -210,7 +210,7 @@ export default class Observer {
     } = instance
 
     if (syncing) {
-      instance.syncing = 0
+      delete instance.syncing
       updateWatchKeypaths(instance)
     }
 
@@ -526,21 +526,8 @@ const DIRTY = '_dirty_'
 let syncIndex = 0
 
 function syncWatchKeypaths(instance) {
-  if (!object.has(instance, 'syncing')) {
-    instance.syncing = 1
-    nextTask.prepend(
-      function () {
-        if (object.has(instance, 'syncing')) {
-          if (instance.syncing > 0) {
-            updateWatchKeypaths(instance)
-          }
-          delete instance.syncing
-        }
-      }
-    )
-  }
-  else {
-    instance.syncing++
+  if (!instance.syncing) {
+    instance.syncing = env.TRUE
   }
 }
 
