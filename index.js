@@ -443,7 +443,7 @@ export default class Observer {
     if (newDeps !== deps[ keypath ]) {
 
       deps[ keypath ] = newDeps
-      syncWatchKeypaths(instance)
+      instance.syncing = env.TRUE
 
       let reversedDeps = { }
 
@@ -513,7 +513,7 @@ object.extend(
      */
     unwatch: function (keypath, watcher) {
       if (this.emitter.off(keypath, watcher)) {
-        syncWatchKeypaths(this)
+        this.syncing = env.TRUE
       }
     }
 
@@ -524,12 +524,6 @@ const FORCE = '._force_'
 const DIRTY = '_dirty_'
 
 let syncIndex = 0
-
-function syncWatchKeypaths(instance) {
-  if (!instance.syncing) {
-    instance.syncing = env.TRUE
-  }
-}
 
 function updateWatchKeypaths(instance) {
 
@@ -589,7 +583,7 @@ function createWatch(action) {
         }
 
         if (instance.emitter[ action ](keypath, watcher)) {
-          syncWatchKeypaths(instance)
+          instance.syncing = env.TRUE
         }
 
         if (!isFuzzyKeypath(keypath)) {
