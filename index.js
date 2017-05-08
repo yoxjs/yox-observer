@@ -336,11 +336,13 @@ export default class Observer {
     }
 
     for (let i = 0, difference; i < differences.length; i++) {
-      let { keypath, realpath, oldValue, match, force } = differences[ i ]
-      let newValue = force ? oldValue : getNewValue(realpath)
+      // 避免 babel 为了 let 作用域创建一个函数
+      // 这里所有变量声明换成 var
+      var { keypath, realpath, oldValue, match, force } = differences[ i ]
+      var newValue = force ? oldValue : getNewValue(realpath)
       if (force || newValue !== oldValue) {
 
-        let args = [ newValue, oldValue, keypath ]
+        var args = [ newValue, oldValue, keypath ]
         if (match) {
           array.push(args, match)
         }
@@ -366,48 +368,52 @@ export default class Observer {
 
           // 当 user.name 变化了
           // 要通知 user.* 的观察者们
-          array.each(
-            watchKeypaths,
-            function (key) {
-              if (key !== realpath) {
-                if (isFuzzyKeypath(key)) {
-                  let match = matchKeypath(realpath, key)
-                  if (match) {
-                    addDifference(key, realpath, match)
+          if (watchKeypaths) {
+            array.each(
+              watchKeypaths,
+              function (key) {
+                if (key !== realpath) {
+                  if (isFuzzyKeypath(key)) {
+                    let match = matchKeypath(realpath, key)
+                    if (match) {
+                      addDifference(key, realpath, match)
+                    }
+                  }
+                  else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
+                    addDifference(key, key)
                   }
                 }
-                else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
-                  addDifference(key, key)
-                }
               }
-            }
-          )
+            )
+          }
 
           // a 依赖 b
           // 当 b 变化了，要通知 a
-          array.each(
-            reversedKeypaths,
-            function (key) {
-              let list
-              if (isFuzzyKeypath(key)) {
-                let match = matchKeypath(realpath, key)
-                if (match) {
+          if (reversedKeypaths) {
+            array.each(
+              reversedKeypaths,
+              function (key) {
+                let list
+                if (isFuzzyKeypath(key)) {
+                  let match = matchKeypath(realpath, key)
+                  if (match) {
+                    list = reversedDeps[ key ]
+                  }
+                }
+                else if (key === realpath) {
                   list = reversedDeps[ key ]
                 }
+                if (list) {
+                  array.each(
+                    list,
+                    function (key) {
+                      addDifference(key, key, env.UNDEFINED, env.TRUE)
+                    }
+                  )
+                }
               }
-              else if (key === realpath) {
-                list = reversedDeps[ key ]
-              }
-              if (list) {
-                array.each(
-                  list,
-                  function (key) {
-                    addDifference(key, key, env.UNDEFINED, env.TRUE)
-                  }
-                )
-              }
-            }
-          )
+            )
+          }
 
         }
       }
