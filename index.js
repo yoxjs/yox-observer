@@ -82,24 +82,10 @@ export default class Observer {
 
           if (get) {
 
-            if (cacheable) {
-              instance.watch(
-                keypath + FORCE,
-                function () {
-                  getter[ DIRTY ] = env.TRUE
-                }
-              )
-            }
-
             let getter = function () {
 
-              if (cacheable) {
-                if (getter[ DIRTY ]) {
-                  getter[ DIRTY ] = env.FALSE
-                }
-                else if (object.has(cache, keypath)) {
-                  return cache[ keypath ]
-                }
+              if (cacheable && object.has(cache, keypath)) {
+                return cache[ keypath ]
               }
 
               if (!deps) {
@@ -200,7 +186,6 @@ export default class Observer {
       deps,
       data,
       cache,
-      syncing,
       emitter,
       context,
       reversedDeps,
@@ -210,21 +195,17 @@ export default class Observer {
       reversedKeypaths,
     } = instance
 
-    if (syncing) {
+    if (instance[ DIRTY ]) {
 
-      delete instance.syncing
+      delete instance[ DIRTY ]
 
-      watchKeypaths = { }
       reversedDeps = { }
-
-      let addKeypath = function (keypath) {
-        watchKeypaths[ keypath ] = env.TRUE
-      }
+      watchKeypaths = { }
 
       object.each(
         emitter.listeners,
         function (list, key) {
-          addKeypath(key)
+          watchKeypaths[ key ] = env.TRUE
         }
       )
 
@@ -234,7 +215,7 @@ export default class Observer {
           array.each(
             deps,
             function (dep) {
-              addKeypath(dep)
+              watchKeypaths[ dep ] = env.TRUE
               array.push(
                 reversedDeps[ dep ] || (reversedDeps[ dep ] = [ ]),
                 key
@@ -269,7 +250,10 @@ export default class Observer {
     let oldCache = { }, newCache = { }
     let getOldValue = function (keypath) {
       if (!object.has(oldCache, keypath)) {
-        oldCache[ keypath ] = cache[ keypath ]
+        oldCache[ keypath ] =
+        object.has(cache, keypath)
+          ? cache[ keypath ]
+          : instance.get(keypath)
       }
       return oldCache[ keypath ]
     }
@@ -311,8 +295,8 @@ export default class Observer {
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
           if (setter) {
-            addDifference(keypath, keypath, env.NULL, env.TRUE)
-            setter.call(context, newValue)
+            addDifference(keypath, keypath, env.UNDEFINED, env.TRUE)
+            execute(setter, context, newValue)
             return
           }
           else {
@@ -334,19 +318,16 @@ export default class Observer {
       }
     )
 
-    let fireDifference = function (keypath, realpath, oldValue) {
+    let finalDifferences
+    let fireDifference = function (keypath, realpath, oldValue, match) {
+
+      if (!finalDifferences) {
+        finalDifferences = { }
+      }
+      finalDifferences[ realpath ] = env.TRUE
 
       let differences = instance.differences || (instance.differences = { })
-      differences[ joinKeypath(keypath, realpath) ] = { keypath, realpath, oldValue }
-
-      object.each(
-        cache,
-        function (value, key) {
-          if (key !== realpath && keypathUtil.startsWith(key, realpath)) {
-            delete cache[ key ]
-          }
-        }
-      )
+      differences[ joinKeypath(keypath, realpath) ] = { keypath, realpath, oldValue, match }
 
       if (!instance.pending) {
         instance.pending = env.TRUE
@@ -361,11 +342,11 @@ export default class Observer {
               object.each(
                 differences,
                 function (difference) {
-                  let { keypath, realpath, oldValue } = difference, newValue = instance.get(realpath)
+                  let { keypath, realpath, oldValue, match } = difference, newValue = instance.get(realpath)
                   if (oldValue !== newValue) {
                     let args = [ newValue, oldValue, keypath ]
-                    if (realpath && realpath !== keypath) {
-                      array.push(args, realpath)
+                    if (match) {
+                      array.push(args, match)
                     }
                     emitter.fire(keypath, args, context)
                   }
@@ -389,24 +370,20 @@ export default class Observer {
         if (match) {
           array.push(args, match)
         }
-        if (force) {
-          emitter.fire(keypath + FORCE, args, context)
+
+        if (object.has(cache, realpath)) {
+          delete cache[ realpath ]
         }
-        else {
-          if (string.has(keypath, FORCE)) {
-            emitter.fire(keypath, args, context)
-            break
-          }
-          else {
-            fireDifference(keypath, realpath, oldValue)
-          }
+
+        if (!force) {
+          fireDifference(keypath, realpath, oldValue, match)
         }
 
         newValue = getNewValue(realpath)
         if (newValue !== oldValue) {
 
           if (force) {
-            fireDifference(keypath, realpath, oldValue)
+            fireDifference(keypath, realpath, oldValue, match)
           }
 
           // 当 user.name 变化了
@@ -476,7 +453,7 @@ export default class Observer {
 
     if (newDeps !== deps[ keypath ]) {
       deps[ keypath ] = newDeps
-      instance.syncing = env.TRUE
+      instance[ DIRTY ] = env.TRUE
     }
 
   }
@@ -525,14 +502,13 @@ object.extend(
      */
     unwatch: function (keypath, watcher) {
       if (this.emitter.off(keypath, watcher)) {
-        this.syncing = env.TRUE
+        this[ DIRTY ] = env.TRUE
       }
     }
 
   }
 )
 
-const FORCE = '._force_'
 const DIRTY = '_dirty_'
 
 let syncIndex = 0
@@ -564,7 +540,7 @@ function createWatch(action) {
         }
 
         if (instance.emitter[ action ](keypath, watcher)) {
-          instance.syncing = env.TRUE
+          instance[ DIRTY ] = env.TRUE
         }
 
         if (!isFuzzyKeypath(keypath)) {
