@@ -308,11 +308,10 @@ export default class Observer {
 
         keypath = keypathUtil.normalize(keypath)
 
-        addDifference(keypath, keypath)
-
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
           if (setter) {
+            addDifference(keypath, keypath, env.NULL, env.TRUE)
             setter.call(context, newValue)
             return
           }
@@ -321,6 +320,7 @@ export default class Observer {
             if (value && rest) {
               value = value()
               if (!is.primitive(value)) {
+                addDifference(keypath, keypath)
                 object.set(value, rest, newValue)
               }
               return
@@ -328,6 +328,7 @@ export default class Observer {
           }
         }
 
+        addDifference(keypath, keypath)
         object.set(data, keypath, newValue)
 
       }
