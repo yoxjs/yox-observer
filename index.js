@@ -199,6 +199,7 @@ export default class Observer {
     let {
       data,
       cache,
+      syncing,
       emitter,
       context,
       reversedDeps,
@@ -207,6 +208,11 @@ export default class Observer {
       watchKeypaths,
       reversedKeypaths,
     } = instance
+
+    if (syncing) {
+      instance.syncing = 0
+      updateWatchKeypaths(instance)
+    }
 
     /**
      * a -> b -> c
@@ -437,7 +443,7 @@ export default class Observer {
     if (newDeps !== deps[ keypath ]) {
 
       deps[ keypath ] = newDeps
-      updateWatchKeypaths(instance)
+      syncWatchKeypaths(instance)
 
       let reversedDeps = { }
 
@@ -507,7 +513,7 @@ object.extend(
      */
     unwatch: function (keypath, watcher) {
       if (this.emitter.off(keypath, watcher)) {
-        updateWatchKeypaths(this)
+        syncWatchKeypaths(this)
       }
     }
 
@@ -518,6 +524,25 @@ const FORCE = '._force_'
 const DIRTY = '_dirty_'
 
 let syncIndex = 0
+
+function syncWatchKeypaths(instance) {
+  if (!object.has(instance, 'syncing')) {
+    instance.syncing = 1
+    nextTask.prepend(
+      function () {
+        if (object.has(instance, 'syncing')) {
+          if (instance.syncing > 0) {
+            updateWatchKeypaths(instance)
+          }
+          delete instance.syncing
+        }
+      }
+    )
+  }
+  else {
+    instance.syncing++
+  }
+}
 
 function updateWatchKeypaths(instance) {
 
@@ -577,7 +602,7 @@ function createWatch(action) {
         }
 
         if (instance.emitter[ action ](keypath, watcher)) {
-          updateWatchKeypaths(instance)
+          syncWatchKeypaths(instance)
         }
 
         if (!isFuzzyKeypath(keypath)) {
@@ -614,7 +639,6 @@ function createWatch(action) {
 
 }
 
-
 let patternCache = { }
 
 /**
@@ -622,7 +646,7 @@ let patternCache = { }
  *
  * @param {string} keypath
  * @param {string} pattern
- * return {?Array.<string>}
+ * @return {?Array.<string>}
  */
 function matchKeypath(keypath, pattern) {
   let cache = patternCache[ pattern ]
