@@ -82,29 +82,30 @@ export default class Observer {
 
           if (get) {
 
-            let getter = function () {
+            instance.computedGetters[ keypath ] = function () {
 
-              if (cacheable && object.has(cache, keypath)) {
-                return cache[ keypath ]
-              }
-
-              if (!deps) {
-                computedStack.push([ ])
+              if (cacheable) {
+                if (object.has(cache, keypath)) {
+                  return cache[ keypath ]
+                }
+                if (!deps) {
+                  computedStack.push([ ])
+                }
               }
 
               let value = execute(get, instance.context)
               cache[ keypath ] = value
 
-              let newDeps = deps || array.pop(computedStack)
-              if (is.array(newDeps)) {
-                instance.setDeps(keypath, newDeps)
+              if (cacheable) {
+                let newDeps = deps || array.pop(computedStack)
+                if (is.array(newDeps)) {
+                  instance.setDeps(keypath, newDeps)
+                }
               }
 
               return value
 
             }
-
-            instance.computedGetters[ keypath ] = getter
 
           }
 
