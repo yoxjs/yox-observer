@@ -167,9 +167,12 @@ export default class Observer {
       result = object.get(data, keypath)
     }
 
-    return result
-      ? (cache[ keypath ] = result.value)
-      : defaultValue
+    if (result) {
+      return cache[ keypath ] = result.value
+    }
+
+    cache[ keypath ] = env.UNDEFINED
+    return defaultValue
 
   }
 
@@ -318,13 +321,7 @@ export default class Observer {
       }
     )
 
-    let finalDifferences
     let fireDifference = function (keypath, realpath, oldValue, match) {
-
-      if (!finalDifferences) {
-        finalDifferences = { }
-      }
-      finalDifferences[ realpath ] = env.TRUE
 
       let differences = instance.differences || (instance.differences = { })
       differences[ joinKeypath(keypath, realpath) ] = { keypath, realpath, oldValue, match }
