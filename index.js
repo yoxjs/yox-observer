@@ -17,7 +17,6 @@ export default class Observer {
    * @param {Object} options
    * @property {Object} options.data
    * @property {?Object} options.computed
-   * @property {?Object} options.watchers
    * @property {?*} options.context 执行 watcher 函数的 this 指向
    */
   constructor(options) {
@@ -26,16 +25,16 @@ export default class Observer {
       data,
       context,
       computed,
-      watchers,
     } = options
 
     let instance = this
 
     instance.data = data
-    instance.cache = { }
     instance.emitter = new Emitter()
     instance.context = context || instance
 
+    // 缓存历史数据，便于对比变化
+    instance.cache = { }
     // 谁依赖了谁
     instance.deps = { }
     // 谁被谁依赖
@@ -115,10 +114,6 @@ export default class Observer {
 
         }
       )
-    }
-
-    if (is.object(watchers)) {
-      instance.watch(watchers)
     }
 
   }
@@ -322,10 +317,10 @@ export default class Observer {
       }
     )
 
-    let fireDifference = function (keypath, realpath, oldValue, match) {
+    let fireDifference = function (difference) {
 
       let differences = instance.differences || (instance.differences = { })
-      differences[ joinKeypath(keypath, realpath) ] = { keypath, realpath, oldValue, match }
+      differences[ joinKeypath(difference.keypath, difference.realpath) ] = difference
 
       if (!instance.pending) {
         instance.pending = env.TRUE
@@ -340,13 +335,13 @@ export default class Observer {
               object.each(
                 differences,
                 function (difference) {
-                  let { keypath, realpath, oldValue, match } = difference, newValue = instance.get(realpath)
+                  let { oldValue } = difference, newValue = instance.get(difference.realpath)
                   if (oldValue !== newValue) {
-                    let args = [ newValue, oldValue, keypath ]
-                    if (match) {
-                      array.push(args, match)
+                    let args = [ newValue, oldValue, difference.keypath ]
+                    if (difference.match) {
+                      array.push(args, difference.match)
                     }
-                    emitter.fire(keypath, args, context)
+                    emitter.fire(difference.keypath, args, context)
                   }
                 }
               )
@@ -357,87 +352,71 @@ export default class Observer {
 
     }
 
-    for (let i = 0, difference; i < differences.length; i++) {
-      // 避免 babel 为了 let 作用域创建一个函数
-      // 这里所有变量声明换成 var
-      var { keypath, realpath, oldValue, match, force } = differences[ i ]
-      var newValue = force ? oldValue : getNewValue(realpath)
-      if (force || newValue !== oldValue) {
+    let i = -1, difference, realpath, oldValue
+    while (difference = differences[ ++i ]) {
 
-        var args = [ newValue, oldValue, keypath ]
-        if (match) {
-          array.push(args, match)
-        }
+      realpath = difference.realpath
+      oldValue = difference.oldValue
 
+      if (difference.force) {
         if (object.has(cache, realpath)) {
           delete cache[ realpath ]
         }
+      }
 
-        if (!force) {
-          fireDifference(keypath, realpath, oldValue, match)
-        }
+      if (getNewValue(realpath) !== oldValue) {
 
-        newValue = getNewValue(realpath)
-        if (newValue !== oldValue) {
+        fireDifference(difference)
 
-          if (force) {
-            fireDifference(keypath, realpath, oldValue, match)
-          }
-
-          // 当 user.name 变化了
-          // 要通知 user.* 的观察者们
-          if (watchKeypaths) {
-            array.each(
-              watchKeypaths,
-              function (key) {
-                if (key !== realpath) {
-                  if (isFuzzyKeypath(key)) {
-                    let match = matchKeypath(realpath, key)
-                    if (match) {
-                      addDifference(key, realpath, match)
-                    }
-                  }
-                  else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
-                    addDifference(key, key)
-                  }
-                }
-              }
-            )
-          }
-
-          // a 依赖 b
-          // 当 b 变化了，要通知 a
-          if (reversedKeypaths) {
-            array.each(
-              reversedKeypaths,
-              function (key) {
-                let list
+        // 当 user.name 变化了
+        // 要通知 user.* 的观察者们
+        if (watchKeypaths) {
+          array.each(
+            watchKeypaths,
+            function (key) {
+              if (key !== realpath) {
                 if (isFuzzyKeypath(key)) {
                   let match = matchKeypath(realpath, key)
                   if (match) {
-                    list = reversedDeps[ key ]
+                    addDifference(key, realpath, match)
                   }
                 }
-                else if (key === realpath) {
-                  list = reversedDeps[ key ]
-                }
-                if (list) {
-                  array.each(
-                    list,
-                    function (key) {
-                      addDifference(key, key, env.UNDEFINED, env.TRUE)
-                    }
-                  )
+                else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
+                  addDifference(key, key)
                 }
               }
-            )
-          }
-
+            }
+          )
         }
-      }
-      else if (is.array(newValue)) {
-        realpath = keypathUtil.join(realpath, 'length')
-        addDifference(realpath, realpath)
+
+        // a 依赖 b
+        // 当 b 变化了，要通知 a
+        if (reversedKeypaths) {
+          array.each(
+            reversedKeypaths,
+            function (key) {
+              let list
+              if (isFuzzyKeypath(key)) {
+                let match = matchKeypath(realpath, key)
+                if (match) {
+                  list = reversedDeps[ key ]
+                }
+              }
+              else if (key === realpath) {
+                list = reversedDeps[ key ]
+              }
+              if (list) {
+                array.each(
+                  list,
+                  function (key) {
+                    addDifference(key, key, env.UNDEFINED, env.TRUE)
+                  }
+                )
+              }
+            }
+          )
+        }
+
       }
 
     }
@@ -454,10 +433,6 @@ export default class Observer {
       instance[ DIRTY ] = env.TRUE
     }
 
-  }
-
-  setCache(keypath, value) {
-    this.cache[ keypath ] = value
   }
 
   /**
