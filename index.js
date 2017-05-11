@@ -317,44 +317,10 @@ export default class Observer {
       }
     )
 
-    let fireDifference = function (difference) {
-
-      let differences = instance.differences || (instance.differences = { })
-      differences[ joinKeypath(difference.keypath, difference.realpath) ] = difference
-
-      if (!instance.pending) {
-        instance.pending = env.TRUE
-        nextTask.append(
-          function () {
-            if (instance.pending) {
-              // 冻结这批变化
-              // 避免 fire 之后同步再次走进这里
-              let { differences } = instance
-              delete instance.pending
-              delete instance.differences
-              object.each(
-                differences,
-                function (difference) {
-                  let { oldValue } = difference, newValue = instance.get(difference.realpath)
-                  if (oldValue !== newValue) {
-                    let args = [ newValue, oldValue, difference.keypath ]
-                    if (difference.match) {
-                      array.push(args, difference.match)
-                    }
-                    emitter.fire(difference.keypath, args, context)
-                  }
-                }
-              )
-            }
-          }
-        )
-      }
-
-    }
-
-    let i = -1, difference, realpath, oldValue
+    let i = -1, difference, keypath, realpath, oldValue, nextDifferences
     while (difference = differences[ ++i ]) {
 
+      keypath = difference.keypath
       realpath = difference.realpath
       oldValue = difference.oldValue
 
@@ -364,9 +330,12 @@ export default class Observer {
         }
       }
 
-      if (getNewValue(realpath) !== oldValue) {
+      if (getNewValue(realpath) !== oldValue
+        || (difference.force = is.object(oldValue) || is.array(oldValue))
+      ) {
 
-        fireDifference(difference)
+        nextDifferences = instance.differences || (instance.differences = { })
+        nextDifferences[ joinKeypath(keypath, realpath) ] = difference
 
         // 当 user.name 变化了
         // 要通知 user.* 的观察者们
@@ -419,6 +388,34 @@ export default class Observer {
 
       }
 
+    }
+
+    if (nextDifferences && !instance.pending) {
+      instance.pending = env.TRUE
+      nextTask.append(
+        function () {
+          if (instance.pending) {
+            // 冻结这批变化
+            // 避免 fire 之后同步再次走进这里
+            let { differences } = instance
+            delete instance.pending
+            delete instance.differences
+            object.each(
+              differences,
+              function (difference) {
+                let { keypath, oldValue } = difference, newValue = instance.get(difference.realpath)
+                if (difference.force || oldValue !== newValue) {
+                  let args = [ newValue, oldValue, keypath ]
+                  if (difference.match) {
+                    array.push(args, difference.match)
+                  }
+                  emitter.fire(keypath, args, context)
+                }
+              }
+            )
+          }
+        }
+      )
     }
 
   }
@@ -484,8 +481,6 @@ object.extend(
 
 const DIRTY = '_dirty_'
 
-let syncIndex = 0
-
 /**
  * watch 和 watchOnce 逻辑相同
  * 提出一个工厂方法
@@ -521,17 +516,19 @@ function createWatch(action) {
           value = instance.get(keypath)
           // 立即执行，通过 Emitter 提供的 $magic 扩展实现
           if (sync) {
-            let syncKey = `sync-${syncIndex++}`
-            watcher.$magic = function () {
-              watcher[ syncKey ] = env.TRUE
-              delete watcher.$magic
+
+            let executed = env.FALSE,
+            magic = function () {
+              executed = env.TRUE
+              if (watcher.$magic === magic) {
+                delete watcher.$magic
+              }
             }
+            watcher.$magic = magic
+
             nextTask.append(
               function () {
-                if (watcher[ syncKey ]) {
-                  delete watcher[ syncKey ]
-                }
-                else if (instance.context) {
+                if (!executed && instance.context) {
                   execute(
                     watcher,
                     instance.context,
@@ -540,6 +537,7 @@ function createWatch(action) {
                 }
               }
             )
+
           }
         }
 
@@ -593,21 +591,20 @@ function isFuzzyKeypath(keypath) {
  */
 function matchBestGetter(getters, keypath) {
 
-  let key, value, rest
+  let result = { }
 
   array.each(
     object.sort(getters, env.TRUE),
     function (prefix) {
       let length = keypathUtil.startsWith(keypath, prefix)
       if (length !== env.FALSE) {
-        key = prefix
-        value = getters[ prefix ]
-        rest = string.slice(keypath, length)
+        result.value = getters[ prefix ]
+        result.rest = string.slice(keypath, length)
         return env.FALSE
       }
     }
   )
 
-  return { key, value, rest }
+  return result
 
 }
