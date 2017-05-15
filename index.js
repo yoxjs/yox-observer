@@ -268,7 +268,7 @@ export default class Observer {
     }
 
     let differences = [ ], differenceMap = { }
-    let addDifference = function (keypath, realpath, match, force) {
+    let addDifference = function (keypath, realpath, match) {
       let fullpath = joinKeypath(keypath, realpath)
       if (!differenceMap[ fullpath ]) {
         differenceMap[ fullpath ] = env.TRUE
@@ -278,7 +278,6 @@ export default class Observer {
             keypath,
             realpath,
             match,
-            force,
             oldValue: getOldValue(realpath),
           }
         )
@@ -294,7 +293,7 @@ export default class Observer {
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
           if (setter) {
-            addDifference(keypath, keypath, env.UNDEFINED, env.TRUE)
+            addDifference(keypath, keypath)
             execute(setter, context, newValue)
             return
           }
@@ -324,10 +323,8 @@ export default class Observer {
       realpath = difference.realpath
       oldValue = difference.oldValue
 
-      if (difference.force) {
-        if (object.has(cache, realpath)) {
-          delete cache[ realpath ]
-        }
+      if (object.has(cache, realpath)) {
+        delete cache[ realpath ]
       }
 
       if (getNewValue(realpath) !== oldValue
@@ -378,7 +375,7 @@ export default class Observer {
                 array.each(
                   list,
                   function (key) {
-                    addDifference(key, key, env.UNDEFINED, env.TRUE)
+                    addDifference(key, key)
                   }
                 )
               }
