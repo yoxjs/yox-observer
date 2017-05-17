@@ -150,12 +150,20 @@ export default class Observer {
     }
 
     if (computedGetters) {
-      let { value, rest } = matchBestGetter(computedGetters, keypath)
-      if (value) {
-        value = value()
-        result = rest && !is.primitive(value)
-          ? object.get(value, rest)
-          : { value }
+      let { getter, prop } = matchBestGetter(computedGetters, keypath)
+      if (getter) {
+        getter = getter()
+        if (prop) {
+          if (object.exists(getter, prop)) {
+            result = { value: getter[ prop ] }
+          }
+          else if (!is.primitive(getter)) {
+            result = object.get(getter, prop)
+          }
+        }
+        else {
+          result = { value: getter }
+        }
       }
     }
 
@@ -239,8 +247,6 @@ export default class Observer {
      * 当修改 b 时，要通知 a 更新，不通知 c 更新
      * 当修改 a 时，仅自己更新
      *
-     * 有时候，b 的数据来自 c 的过滤，当修改 b 时，实际是修改 c，这时候，应该从最深层开始往上通知
-     *
      * 当监听 user.* 时，如果修改了 user.name，不仅要触发 user.name 的 watcher，也要触发 user.* 的 watcher
      *
      * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
@@ -298,12 +304,12 @@ export default class Observer {
             return
           }
           else {
-            let { value, rest } = matchBestGetter(computedGetters, keypath)
-            if (value && rest) {
-              value = value()
-              if (!is.primitive(value)) {
+            let { getter, prop } = matchBestGetter(computedGetters, keypath)
+            if (getter && prop) {
+              getter = getter()
+              if (!is.primitive(getter)) {
                 addDifference(keypath, keypath)
-                object.set(value, rest, newValue)
+                object.set(getter, prop, newValue)
               }
               return
             }
@@ -316,7 +322,7 @@ export default class Observer {
       }
     )
 
-    let i = -1, difference, keypath, realpath, oldValue, nextDifferences
+    let i = -1, difference, keypath, realpath, oldValue, isChange, nextDifferences
     while (difference = differences[ ++i ]) {
 
       keypath = difference.keypath
@@ -327,9 +333,14 @@ export default class Observer {
         delete cache[ realpath ]
       }
 
-      if (getNewValue(realpath) !== oldValue
-        || (difference.force = is.object(oldValue) || is.array(oldValue))
-      ) {
+      isChange = getNewValue(realpath) !== oldValue
+      if (!isChange && is.array(oldValue) && oldValue[ Observer.FORCE ]) {
+        isChange = env.TRUE
+        difference.force = env.TRUE
+        delete oldValue[ Observer.FORCE ]
+      }
+
+      if (isChange) {
 
         nextDifferences = instance.differences || (instance.differences = { })
         nextDifferences[ joinKeypath(keypath, realpath) ] = difference
@@ -476,6 +487,8 @@ object.extend(
   }
 )
 
+Observer.FORCE = '_force_'
+
 const DIRTY = '_dirty_'
 
 /**
@@ -595,8 +608,8 @@ function matchBestGetter(getters, keypath) {
     function (prefix) {
       let length = keypathUtil.startsWith(keypath, prefix)
       if (length !== env.FALSE) {
-        result.value = getters[ prefix ]
-        result.rest = string.slice(keypath, length)
+        result.getter = getters[ prefix ]
+        result.prop = string.slice(keypath, length)
         return env.FALSE
       }
     }
