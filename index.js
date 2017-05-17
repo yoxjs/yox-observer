@@ -109,7 +109,9 @@ export default class Observer {
           }
 
           if (set) {
-            instance.computedSetters[ keypath ] = set
+            instance.computedSetters[ keypath ] = function (value) {
+              set.call(instance.context, value)
+            }
           }
 
         }
@@ -194,7 +196,6 @@ export default class Observer {
       data,
       cache,
       emitter,
-      context,
       reversedDeps,
       computedGetters,
       computedSetters,
@@ -300,7 +301,7 @@ export default class Observer {
           let setter = computedSetters[ keypath ]
           if (setter) {
             addDifference(keypath, keypath)
-            execute(setter, context, newValue)
+            setter(newValue)
             return
           }
           else {
@@ -417,7 +418,7 @@ export default class Observer {
                   if (difference.match) {
                     array.push(args, difference.match)
                   }
-                  emitter.fire(keypath, args, context)
+                  emitter.fire(keypath, args)
                 }
               }
             )
@@ -479,7 +480,9 @@ object.extend(
      * @param {?Function} watcher
      */
     unwatch: function (keypath, watcher) {
-      if (this.emitter.off(keypath, watcher)) {
+      let { emitter } = this
+      emitter.off(keypath, watcher)
+      if (!emitter.has(keypath)) {
         this[ DIRTY ] = env.TRUE
       }
     }
@@ -517,32 +520,23 @@ function createWatch(action) {
           sync = value.sync
         }
 
-        if (instance.emitter[ action ](keypath, watcher)) {
+        let { emitter } = instance, listener = { func: watcher, context: instance.context }
+        if (!emitter.has(keypath)) {
           instance[ DIRTY ] = env.TRUE
         }
 
+        emitter[ action ](keypath, listener)
+
         if (!isFuzzyKeypath(keypath)) {
-          // 既然是 watch, 就先通过 get 缓存当前值，便于下次对比
-          value = instance.get(keypath)
-          // 立即执行，通过 Emitter 提供的 $magic 扩展实现
           if (sync) {
-
-            let executed = env.FALSE,
-            magic = function () {
-              executed = env.TRUE
-              if (watcher.$magic === magic) {
-                delete watcher.$magic
-              }
-            }
-            watcher.$magic = magic
-
             nextTask.append(
               function () {
-                if (!executed && instance.context) {
+                let { context } = instance
+                if (context && !listener.count) {
                   execute(
                     watcher,
-                    instance.context,
-                    [ instance.get(keypath), value, keypath ]
+                    context,
+                    [ instance.get(keypath), env.UNDEFINED, keypath ]
                   )
                 }
               }
