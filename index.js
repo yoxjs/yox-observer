@@ -502,7 +502,7 @@ function createWatch(action) {
 
   return function (keypath, watcher, sync) {
 
-    let watchers = keypath, creating = watcher === env.TRUE
+    let watchers = keypath
     if (is.string(keypath)) {
       watchers = { }
       watchers[ keypath ] = { sync, watcher }
@@ -520,35 +520,24 @@ function createWatch(action) {
           sync = value.sync
         }
 
-        let { emitter, context } = instance, listener = { func: watcher, context }
+        let { emitter, context } = instance
         if (!emitter.has(keypath)) {
           instance[ DIRTY ] = env.TRUE
         }
-
-        emitter[ action ](keypath, listener)
-
-        if (!isFuzzyKeypath(keypath)) {
-          if (sync) {
-            let executeWatcher = function () {
-              execute(
-                watcher,
-                context,
-                [ instance.get(keypath), env.UNDEFINED, keypath ]
-              )
-            }
-            if (creating) {
-              nextTask.append(
-                function () {
-                  if (instance.deps && !listener.count) {
-                    executeWatcher()
-                  }
-                }
-              )
-            }
-            else {
-              executeWatcher()
-            }
+        emitter[ action ](
+          keypath,
+          {
+            func: watcher,
+            context
           }
+        )
+
+        if (sync && !isFuzzyKeypath(keypath)) {
+          execute(
+            watcher,
+            context,
+            [ instance.get(keypath), env.UNDEFINED, keypath ]
+          )
         }
 
       }
