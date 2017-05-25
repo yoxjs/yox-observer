@@ -519,12 +519,16 @@ function createWatch(action) {
         }
       )
 
-      if (sync && !isFuzzyKeypath(keypath)) {
-        execute(
-          watcher,
-          context,
-          [ instance.get(keypath), env.UNDEFINED, keypath ]
-        )
+      if (!isFuzzyKeypath(keypath)) {
+        // 为了存下 oldValue
+        instance.get(keypath)
+        if (sync) {
+          execute(
+            watcher,
+            context,
+            [ instance.get(keypath), env.UNDEFINED, keypath ]
+          )
+        }
       }
 
     }
