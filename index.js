@@ -538,7 +538,7 @@ function createWatch(action) {
     }
     else {
       object.each(
-        watchers,
+        keypath,
         function (value, keypath) {
           let watcher = value, sync
           if (is.object(value)) {
