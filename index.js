@@ -270,10 +270,6 @@ export default class Observer {
       return newCache[ keypath ]
     }
 
-    let joinKeypath = function (keypath1, keypath2) {
-      return keypath1 + char.CHAR_DASH + keypath2
-    }
-
     let differences = [ ], differenceMap = { }
     let addDifference = function (keypath, realpath, match) {
       let fullpath = joinKeypath(keypath, realpath)
@@ -494,6 +490,10 @@ Observer.FORCE = '_force_'
 
 const DIRTY = '_dirty_'
 
+function joinKeypath(keypath, realpath) {
+  return keypath + char.CHAR_DASH + realpath
+}
+
 /**
  * watch 和 watchOnce 逻辑相同
  * 提出一个工厂方法
@@ -506,7 +506,7 @@ function createWatch(action) {
 
     let watch = function (keypath, watcher, sync) {
 
-      let { emitter, context } = instance
+      let { emitter, context, differences } = instance
       if (!emitter.has(keypath)) {
         instance[ DIRTY ] = env.TRUE
       }
@@ -523,6 +523,13 @@ function createWatch(action) {
         // 为了存下 oldValue
         instance.get(keypath)
         if (sync) {
+          if (differences) {
+            let difference = differences[ joinKeypath(keypath, keypath) ]
+            if (difference) {
+              difference.force = env.TRUE
+              return
+            }
+          }
           execute(
             watcher,
             context,
