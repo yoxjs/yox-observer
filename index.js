@@ -319,7 +319,7 @@ export default class Observer {
       }
     )
 
-    let i = -1, difference, keypath, realpath, oldValue, isChange, nextDifferences
+    let i = -1, difference, keypath, realpath, oldValue, nextDifferences
     while (difference = differences[ ++i ]) {
 
       keypath = difference.keypath
@@ -330,14 +330,7 @@ export default class Observer {
         delete cache[ realpath ]
       }
 
-      isChange = getNewValue(realpath) !== oldValue
-      if (!isChange && is.array(oldValue) && oldValue[ Observer.FORCE ]) {
-        isChange = env.TRUE
-        difference.force = env.TRUE
-        delete oldValue[ Observer.FORCE ]
-      }
-
-      if (isChange) {
+      if (getNewValue(realpath) !== oldValue) {
 
         nextDifferences = instance.differences || (instance.differences = { })
         nextDifferences[ joinKeypath(keypath, realpath) ] = difference
@@ -485,8 +478,6 @@ object.extend(
 
   }
 )
-
-Observer.FORCE = '_force_'
 
 const DIRTY = '_dirty_'
 
