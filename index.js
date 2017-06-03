@@ -9,6 +9,7 @@ import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
 import execute from 'yox-common/function/execute'
+import toNumber from 'yox-common/function/toNumber'
 import Emitter from 'yox-common/util/Emitter'
 
 export default class Observer {
@@ -29,7 +30,7 @@ export default class Observer {
 
     let instance = this
 
-    instance.data = data
+    instance.data = data || { }
     instance.emitter = new Emitter()
     instance.context = context || instance
 
@@ -37,8 +38,6 @@ export default class Observer {
     instance.cache = { }
     // 谁依赖了谁
     instance.deps = { }
-    // 谁被谁依赖
-    instance.reversedDeps = { }
 
     // 计算属性也是数据
     if (is.object(computed)) {
@@ -81,25 +80,32 @@ export default class Observer {
 
           if (get) {
 
+            let needDeps = cacheable
+            if (needDeps && deps) {
+              needDeps = env.FALSE
+              if (is.array(deps)) {
+                instance.setDeps(keypath, deps)
+              }
+            }
+
             instance.computedGetters[ keypath ] = function () {
 
-              if (cacheable) {
-                if (object.has(cache, keypath)) {
-                  return cache[ keypath ]
-                }
-                if (!deps) {
-                  computedStack.push([ ])
-                }
+              if (cacheable && object.has(cache, keypath)) {
+                return cache[ keypath ]
+              }
+
+              if (needDeps) {
+                computedStack.push([ ])
               }
 
               let value = execute(get, instance.context)
               cache[ keypath ] = value
 
-              if (cacheable) {
-                let newDeps = deps || array.pop(computedStack)
-                if (is.array(newDeps)) {
-                  instance.setDeps(keypath, newDeps)
-                }
+              if (needDeps) {
+                instance.setDeps(
+                  keypath,
+                  array.pop(computedStack)
+                )
               }
 
               return value
@@ -185,9 +191,21 @@ export default class Observer {
   /**
    * 更新数据
    *
-   * @param {Object} model
+   * @param {string|Object} keypath
+   * @param {?*} value
+   * @param {?boolean} sync
    */
-  set(model) {
+  set(keypath, value, sync) {
+
+    let model
+    if (is.string(keypath)) {
+      model = { }
+      model[ keypath ] = value
+    }
+    else if (is.object(keypath)) {
+      model = keypath
+      sync = value
+    }
 
     let instance = this
 
@@ -196,18 +214,16 @@ export default class Observer {
       data,
       cache,
       emitter,
-      reversedDeps,
+      differences,
       computedGetters,
       computedSetters,
       watchKeypaths,
-      reversedKeypaths,
     } = instance
 
     if (instance[ DIRTY ]) {
 
       delete instance[ DIRTY ]
 
-      reversedDeps = { }
       watchKeypaths = { }
 
       object.each(
@@ -217,43 +233,21 @@ export default class Observer {
         }
       )
 
-      object.each(
-        deps,
-        function (deps, key) {
-          array.each(
-            deps,
-            function (dep) {
-              watchKeypaths[ dep ] = env.TRUE
-              array.push(
-                reversedDeps[ dep ] || (reversedDeps[ dep ] = [ ]),
-                key
-              )
-            }
-          )
-        }
-      )
-
-      reversedDeps = instance.reversedDeps = reversedDeps
-      watchKeypaths = instance.watchKeypaths = object.sort(watchKeypaths, env.TRUE)
-      reversedKeypaths = instance.reversedKeypaths = object.sort(reversedDeps, env.TRUE)
+      watchKeypaths =
+      instance.watchKeypaths =
+      object.sort(watchKeypaths, env.TRUE)
 
     }
 
     /**
-     * a -> b -> c
+     * 修改数据分 3 步：
      *
-     * a 依赖 b，b 依赖 c
-     *
-     * 当修改 c 时，要通知 a 和 b 更新
-     * 当修改 b 时，要通知 a 更新，不通知 c 更新
-     * 当修改 a 时，仅自己更新
-     *
-     * 当监听 user.* 时，如果修改了 user.name，不仅要触发 user.name 的 watcher，也要触发 user.* 的 watcher
-     *
-     * 这里遵循的一个原则是，只有当修改数据确实产生了数据变化，才会分析它的依赖
+     * 1. 预分析所有潜在的 watch 字段，并提取出 oldValue
+     * 2. 设值
+     * 3. 遍历第一步收集的所有 watch 字段，并提取出 newValue 进行对比
      */
 
-    let oldCache = { }, newCache = { }
+    let oldCache = { }
     let getOldValue = function (keypath) {
       if (!object.has(oldCache, keypath)) {
         oldCache[ keypath ] =
@@ -263,6 +257,8 @@ export default class Observer {
       }
       return oldCache[ keypath ]
     }
+
+    let newCache = { }
     let getNewValue = function (keypath) {
       if (!object.has(newCache, keypath)) {
         newCache[ keypath ] = instance.get(keypath)
@@ -270,22 +266,29 @@ export default class Observer {
       return newCache[ keypath ]
     }
 
-    let differences = [ ], differenceMap = { }
-    let addDifference = function (keypath, realpath, match) {
-      let fullpath = joinKeypath(keypath, realpath)
-      if (!differenceMap[ fullpath ]) {
-        differenceMap[ fullpath ] = env.TRUE
-        array.push(
-          differences,
-          {
-            keypath,
-            realpath,
-            match,
-            oldValue: getOldValue(realpath),
+    let matchDeps = function (key, keypath) {
+      let result
+      array.each(
+        deps[ key ],
+        function (dep) {
+          if (isFuzzyKeypath(dep)) {
+            result = matchKeypath(keypath, dep)
           }
-        )
-      }
+          else {
+            result = keypath === dep
+          }
+          if (!result && object.has(deps, dep)) {
+            result = matchDeps(dep, keypath)
+          }
+          if (result) {
+            return env.FALSE
+          }
+        }
+      )
+      return result
     }
+
+    let tasks = [ ]
 
     object.each(
       model,
@@ -293,10 +296,75 @@ export default class Observer {
 
         keypath = keypathUtil.normalize(keypath)
 
+        let oldValue = getOldValue(keypath)
+        if (newValue !== oldValue) {
+
+          array.push(
+            tasks,
+            {
+              keypath,
+              realpath: keypath,
+              oldValue,
+            }
+          )
+
+          // 当 user.name 变化了
+          // 要通知 user.* 的观察者们
+          if (watchKeypaths) {
+            array.each(
+              watchKeypaths,
+              function (key) {
+                if (key !== keypath) {
+                  if (isFuzzyKeypath(key)) {
+                    if (matchKeypath(keypath, key)) {
+                      array.push(
+                        tasks,
+                        {
+                          keypath: key,
+                          realpath: keypath,
+                          oldValue: getOldValue(keypath),
+                        }
+                      )
+                    }
+                  }
+                  else if (keypathUtil.startsWith(key, keypath) !== env.FALSE) {
+                    array.push(
+                      tasks,
+                      {
+                        keypath: key,
+                        realpath: key,
+                        oldValue: getOldValue(key),
+                      }
+                    )
+                  }
+                }
+              }
+            )
+          }
+
+          // a 依赖 b
+          // 当 b 变化了，要通知 a
+          object.each(
+            deps,
+            function (list, key) {
+              if (matchDeps(key, keypath)) {
+                array.push(
+                  tasks,
+                  {
+                    keypath: key,
+                    realpath: key,
+                    oldValue: getOldValue(key),
+                  }
+                )
+              }
+            }
+          )
+
+        }
+
         if (computedSetters) {
           let setter = computedSetters[ keypath ]
           if (setter) {
-            addDifference(keypath, keypath)
             setter(newValue)
             return
           }
@@ -305,7 +373,6 @@ export default class Observer {
             if (getter && prop) {
               getter = getter()
               if (!is.primitive(getter)) {
-                addDifference(keypath, keypath)
                 object.set(getter, prop, newValue)
               }
               return
@@ -313,121 +380,220 @@ export default class Observer {
           }
         }
 
-        addDifference(keypath, keypath)
         object.set(data, keypath, newValue)
 
       }
     )
 
-    let i = -1, difference, keypath, realpath, oldValue, nextDifferences
-    while (difference = differences[ ++i ]) {
+    let result = [ ]
 
-      keypath = difference.keypath
-      realpath = difference.realpath
-      oldValue = difference.oldValue
+    array.each(
+      tasks,
+      function (task) {
 
-      if (object.has(cache, realpath)) {
-        delete cache[ realpath ]
-      }
+        let { keypath, realpath, oldValue } = task
 
-      if (getNewValue(realpath) !== oldValue) {
-
-        nextDifferences = instance.differences || (instance.differences = { })
-        nextDifferences[ joinKeypath(keypath, realpath) ] = difference
-
-        // 当 user.name 变化了
-        // 要通知 user.* 的观察者们
-        if (watchKeypaths) {
-          array.each(
-            watchKeypaths,
-            function (key) {
-              if (key !== realpath) {
-                if (isFuzzyKeypath(key)) {
-                  let match = matchKeypath(realpath, key)
-                  if (match) {
-                    addDifference(key, realpath, match)
-                  }
-                }
-                else if (keypathUtil.startsWith(key, realpath) !== env.FALSE) {
-                  addDifference(key, key)
-                }
-              }
-            }
-          )
+        if (object.has(cache, realpath)) {
+          delete cache[ realpath ]
         }
 
-        // a 依赖 b
-        // 当 b 变化了，要通知 a
-        if (reversedKeypaths) {
-          array.each(
-            reversedKeypaths,
-            function (key) {
-              let list
-              if (isFuzzyKeypath(key)) {
-                let match = matchKeypath(realpath, key)
-                if (match) {
-                  list = reversedDeps[ key ]
-                }
-              }
-              else if (key === realpath) {
-                list = reversedDeps[ key ]
-              }
-              if (list) {
-                array.each(
-                  list,
-                  function (key) {
-                    addDifference(key, key)
-                  }
-                )
-              }
-            }
-          )
-        }
+        if (getNewValue(realpath) !== oldValue) {
 
-      }
-
-    }
-
-    if (nextDifferences && !instance.pending) {
-      instance.pending = env.TRUE
-      nextTask.append(
-        function () {
-          if (instance.pending) {
-            // 冻结这批变化
-            // 避免 fire 之后同步再次走进这里
-            let { differences } = instance
-            delete instance.pending
-            delete instance.differences
-            object.each(
-              differences,
-              function (difference) {
-                let { keypath, oldValue } = difference, newValue = instance.get(difference.realpath)
-                if (difference.force || oldValue !== newValue) {
-                  let args = [ newValue, oldValue, keypath ]
-                  if (difference.match) {
-                    array.push(args, difference.match)
-                  }
-                  emitter.fire(keypath, args)
-                }
-              }
-            )
+          if (!array.has(result, realpath)) {
+            array.push(result, realpath)
           }
+
+          if (!differences) {
+            differences = instance.differences = { }
+          }
+
+          differences[ joinKeypath(keypath, realpath) ] = task
+
         }
-      )
+
+      }
+    )
+
+    if (result.length) {
+      let fire = function () {
+        // 冻结这批变化
+        // 避免 fire 之后同步再次走进这里
+        let { differences } = instance
+        delete instance.differences
+        if (instance.pending) {
+          delete instance.pending
+        }
+        object.each(
+          differences,
+          function (difference) {
+            let { keypath, realpath, oldValue } = difference, newValue = instance.get(realpath)
+            if (difference.force || oldValue !== newValue) {
+              let args = [ newValue, oldValue, keypath ]
+              if (keypath !== realpath) {
+                array.push(args, matchKeypath(realpath, keypath))
+              }
+              emitter.fire(keypath, args)
+            }
+          }
+        )
+      }
+      if (sync) {
+        fire()
+      }
+      else if (!instance.pending) {
+        instance.pending = env.TRUE
+        nextTask.append(
+          function () {
+            if (instance.pending) {
+              fire()
+            }
+          }
+        )
+      }
     }
+
+    return result
 
   }
 
   setDeps(keypath, newDeps) {
 
-    let instance = this
-    let { deps } = instance
-
+    let { deps } = this
     if (newDeps !== deps[ keypath ]) {
       deps[ keypath ] = newDeps
-      instance[ DIRTY ] = env.TRUE
+      this[ DIRTY ] = env.TRUE
     }
 
+  }
+
+  /**
+   * 取反 keypath 对应的数据
+   *
+   * 不管 keypath 对应的数据是什么类型，操作后都是布尔型
+   *
+   * @param {string} keypath
+   * @return {boolean} 取反后的布尔值
+   */
+  toggle(keypath) {
+    let value = !this.get(keypath)
+    this.set(keypath, value)
+    return value
+  }
+
+  /**
+   * 递增 keypath 对应的数据
+   *
+   * 注意，最好是整型的加法，如果涉及浮点型，不保证计算正确
+   *
+   * @param {string} keypath 值必须能转型成数字，如果不能，则默认从 0 开始递增
+   * @param {?number} step 步进值，默认是 1
+   * @param {?number} min 可以递增到的最小值，默认不限制
+   * @return {number} 返回递增后的值
+   */
+  increase(keypath, step, max) {
+    let value = toNumber(this.get(keypath), 0) + (is.numeric(step) ? step : 1)
+    if (!is.numeric(max) || value <= max) {
+      this.set(keypath, value)
+    }
+    return value
+  }
+
+  /**
+   * 递减 keypath 对应的数据
+   *
+   * 注意，最好是整型的减法，如果涉及浮点型，不保证计算正确
+   *
+   * @param {string} keypath 值必须能转型成数字，如果不能，则默认从 0 开始递减
+   * @param {?number} step 步进值，默认是 1
+   * @param {?number} min 可以递减到的最小值，默认不限制
+   * @return {number} 返回递减后的值
+   */
+  decrease(keypath, step, min) {
+    let value = toNumber(this.get(keypath), 0) - (is.numeric(step) ? step : 1)
+    if (!is.numeric(min) || value >= min) {
+      this.set(keypath, value)
+    }
+    return value
+  }
+
+  /**
+   * 在数组指定位置插入元素
+   *
+   * @param {string} keypath
+   * @param {*} item
+   * @param {number} index
+   * @return {?boolean} 是否插入成功
+   */
+  insert(keypath, item, index) {
+
+    let list = this.get(keypath)
+    if (!is.array(list)) {
+      list = [ ]
+    }
+    else {
+      list = object.copy(list)
+    }
+
+    let { length } = list
+    if (index === env.TRUE || index === length) {
+      list.push(item)
+    }
+    else if (index === env.FALSE || index === 0) {
+      list.unshift(item)
+    }
+    else if (index > 0 && index < length) {
+      list.splice(index, 0, item)
+    }
+    else {
+      return
+    }
+
+    this.set(keypath, list)
+
+    return env.TRUE
+
+  }
+
+  /**
+   * 通过索引移除数组中的元素
+   *
+   * @param {string} keypath
+   * @param {number} index
+   * @return {?boolean} 是否移除成功
+   */
+  removeAt(keypath, index) {
+    let list = this.get(keypath)
+    if (is.array(list)
+      && index >= 0
+      && index < list.length
+    ) {
+      list = object.copy(list)
+      list.splice(index, 1)
+      this.set(keypath, list)
+      return env.TRUE
+    }
+  }
+
+  /**
+   * 直接移除数组中的元素
+   *
+   * @param {string} keypath
+   * @param {*} item
+   * @return {?boolean} 是否移除成功
+   */
+  remove(keypath, item) {
+    let list = this.get(keypath)
+    if (is.array(list)) {
+      list = object.copy(list)
+      if (array.remove(list, item)) {
+        this.set(keypath, list)
+        return env.TRUE
+      }
+    }
+  }
+
+  nextTick(fn) {
+    nextTask.append(fn)
   }
 
   /**
@@ -510,23 +676,19 @@ function createWatch(action) {
         }
       )
 
-      if (!isFuzzyKeypath(keypath)) {
-        // 为了存下 oldValue
-        instance.get(keypath)
-        if (sync) {
-          if (differences) {
-            let difference = differences[ joinKeypath(keypath, keypath) ]
-            if (difference) {
-              difference.force = env.TRUE
-              return
-            }
+      if (sync && !isFuzzyKeypath(keypath)) {
+        if (differences) {
+          let difference = differences[ joinKeypath(keypath, keypath) ]
+          if (difference) {
+            difference.force = env.TRUE
+            return
           }
-          execute(
-            watcher,
-            context,
-            [ instance.get(keypath), env.UNDEFINED, keypath ]
-          )
         }
+        execute(
+          watcher,
+          context,
+          [ instance.get(keypath), env.UNDEFINED, keypath ]
+        )
       }
 
     }
