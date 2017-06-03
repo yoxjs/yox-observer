@@ -218,24 +218,27 @@ export default class Observer {
       computedGetters,
       computedSetters,
       watchKeypaths,
+      watchFuzzyKeypaths,
     } = instance
 
     if (instance[ DIRTY ]) {
 
       delete instance[ DIRTY ]
 
-      watchKeypaths = { }
+      watchKeypaths = instance.watchKeypaths = { }
+      watchFuzzyKeypaths = instance.watchFuzzyKeypaths = { }
 
       object.each(
         emitter.listeners,
         function (list, key) {
-          watchKeypaths[ key ] = env.TRUE
+          if (isFuzzyKeypath(key)) {
+            watchFuzzyKeypaths[ key ] = env.TRUE
+          }
+          else {
+            watchKeypaths[ key ] = env.TRUE
+          }
         }
       )
-
-      watchKeypaths =
-      instance.watchKeypaths =
-      object.sort(watchKeypaths, env.TRUE)
 
     }
 
@@ -275,7 +278,7 @@ export default class Observer {
             result = matchKeypath(keypath, dep)
           }
           else {
-            result = keypath === dep
+            result = keypathUtil.startsWith(dep, keypath)
           }
           if (!result && object.has(deps, dep)) {
             result = matchDeps(dep, keypath)
@@ -303,47 +306,29 @@ export default class Observer {
             tasks,
             {
               keypath,
-              realpath: keypath,
               oldValue,
             }
           )
 
-          // 当 user.name 变化了
-          // 要通知 user.* 的观察者们
           if (watchKeypaths) {
-            array.each(
+            object.each(
               watchKeypaths,
-              function (key) {
-                if (key !== keypath) {
-                  if (isFuzzyKeypath(key)) {
-                    if (matchKeypath(keypath, key)) {
-                      array.push(
-                        tasks,
-                        {
-                          keypath: key,
-                          realpath: keypath,
-                          oldValue: getOldValue(keypath),
-                        }
-                      )
+              function (value, key) {
+                if (key !== keypath
+                  && keypathUtil.startsWith(key, keypath)
+                ) {
+                  array.push(
+                    tasks,
+                    {
+                      keypath: key,
+                      oldValue: getOldValue(key),
                     }
-                  }
-                  else if (keypathUtil.startsWith(key, keypath) !== env.FALSE) {
-                    array.push(
-                      tasks,
-                      {
-                        keypath: key,
-                        realpath: key,
-                        oldValue: getOldValue(key),
-                      }
-                    )
-                  }
+                  )
                 }
               }
             )
           }
 
-          // a 依赖 b
-          // 当 b 变化了，要通知 a
           object.each(
             deps,
             function (list, key) {
@@ -352,7 +337,6 @@ export default class Observer {
                   tasks,
                   {
                     keypath: key,
-                    realpath: key,
                     oldValue: getOldValue(key),
                   }
                 )
@@ -391,23 +375,23 @@ export default class Observer {
       tasks,
       function (task) {
 
-        let { keypath, realpath, oldValue } = task
+        let { keypath, oldValue } = task
 
-        if (object.has(cache, realpath)) {
-          delete cache[ realpath ]
+        if (object.has(cache, keypath)) {
+          delete cache[ keypath ]
         }
 
-        if (getNewValue(realpath) !== oldValue) {
+        if (getNewValue(keypath) !== oldValue) {
 
-          if (!array.has(result, realpath)) {
-            array.push(result, realpath)
+          if (!array.has(result, keypath)) {
+            array.push(result, keypath)
           }
 
           if (!differences) {
             differences = instance.differences = { }
           }
 
-          differences[ joinKeypath(keypath, realpath) ] = task
+          differences[ keypath ] = task
 
         }
 
@@ -418,7 +402,7 @@ export default class Observer {
       let fire = function () {
         // 冻结这批变化
         // 避免 fire 之后同步再次走进这里
-        let { differences } = instance
+        let { differences, watchFuzzyKeypaths } = instance
         delete instance.differences
         if (instance.pending) {
           delete instance.pending
@@ -426,13 +410,23 @@ export default class Observer {
         object.each(
           differences,
           function (difference) {
-            let { keypath, realpath, oldValue } = difference, newValue = instance.get(realpath)
+            let { keypath, oldValue } = difference, newValue = instance.get(keypath)
             if (difference.force || oldValue !== newValue) {
               let args = [ newValue, oldValue, keypath ]
-              if (keypath !== realpath) {
-                array.push(args, matchKeypath(realpath, keypath))
-              }
               emitter.fire(keypath, args)
+              if (watchFuzzyKeypaths) {
+                object.each(
+                  watchFuzzyKeypaths,
+                  function (value, key) {
+                    let match = matchKeypath(keypath, key)
+                    if (match) {
+                      let newArgs = object.copy(args)
+                      array.push(newArgs, match)
+                      emitter.fire(key, newArgs)
+                    }
+                  }
+                )
+              }
             }
           }
         )
@@ -647,10 +641,6 @@ object.extend(
 
 const DIRTY = '_dirty_'
 
-function joinKeypath(keypath, realpath) {
-  return keypath + char.CHAR_DASH + realpath
-}
-
 /**
  * watch 和 watchOnce 逻辑相同
  * 提出一个工厂方法
@@ -678,7 +668,7 @@ function createWatch(action) {
 
       if (sync && !isFuzzyKeypath(keypath)) {
         if (differences) {
-          let difference = differences[ joinKeypath(keypath, keypath) ]
+          let difference = differences[ keypath ]
           if (difference) {
             difference.force = env.TRUE
             return
