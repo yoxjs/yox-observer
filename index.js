@@ -197,7 +197,7 @@ export default class Observer {
    */
   set(keypath, value, sync) {
 
-    let model
+    let model, result = [ ]
     if (is.string(keypath)) {
       model = { }
       model[ keypath ] = value
@@ -205,6 +205,9 @@ export default class Observer {
     else if (is.object(keypath)) {
       model = keypath
       sync = value
+    }
+    else {
+      return result
     }
 
     let instance = this
@@ -369,8 +372,6 @@ export default class Observer {
       }
     )
 
-    let result = [ ]
-
     array.each(
       tasks,
       function (task) {
@@ -399,55 +400,71 @@ export default class Observer {
     )
 
     if (result.length) {
-      let fire = function () {
-        // 冻结这批变化
-        // 避免 fire 之后同步再次走进这里
-        let { differences, watchFuzzyKeypaths } = instance
-        delete instance.differences
-        if (instance.pending) {
-          delete instance.pending
-        }
-        object.each(
-          differences,
-          function (difference) {
-            let { keypath, oldValue } = difference, newValue = instance.get(keypath)
-            if (difference.force || oldValue !== newValue) {
-              let args = [ newValue, oldValue, keypath ]
-              emitter.fire(keypath, args)
-              if (watchFuzzyKeypaths) {
-                object.each(
-                  watchFuzzyKeypaths,
-                  function (value, key) {
-                    let match = matchKeypath(keypath, key)
-                    if (match) {
-                      let newArgs = object.copy(args)
-                      array.push(newArgs, match)
-                      emitter.fire(key, newArgs)
-                    }
-                  }
-                )
-              }
-            }
-          }
-        )
-      }
       if (sync) {
-        fire()
+        instance.flush()
       }
-      else if (!instance.pending) {
-        instance.pending = env.TRUE
-        nextTask.append(
-          function () {
-            if (instance.pending) {
-              fire()
-            }
-          }
-        )
+      else {
+        instance.flushAsync()
       }
     }
 
     return result
 
+  }
+
+  flush() {
+
+    let instance = this
+
+    if (instance.pending) {
+      delete instance.pending
+    }
+
+    // 冻结这批变化
+    // 避免 fire 之后同步再次走进这里
+    let { emitter, differences, watchFuzzyKeypaths } = instance
+    if (differences) {
+      delete instance.differences
+
+      object.each(
+        differences,
+        function (difference) {
+          let { keypath, oldValue } = difference, newValue = instance.get(keypath)
+          if (difference.force || oldValue !== newValue) {
+            let args = [ newValue, oldValue, keypath ]
+            emitter.fire(keypath, args)
+            if (watchFuzzyKeypaths) {
+              object.each(
+                watchFuzzyKeypaths,
+                function (value, key) {
+                  let match = matchKeypath(keypath, key)
+                  if (match) {
+                    let newArgs = object.copy(args)
+                    array.push(newArgs, match)
+                    emitter.fire(key, newArgs)
+                  }
+                }
+              )
+            }
+          }
+        }
+      )
+    }
+
+  }
+
+  flushAsync() {
+    let instance = this
+    if (!instance.pending) {
+      instance.pending = env.TRUE
+      nextTask.append(
+        function () {
+          if (instance.pending) {
+            instance.flush()
+          }
+        }
+      )
+    }
   }
 
   setDeps(keypath, newDeps) {
