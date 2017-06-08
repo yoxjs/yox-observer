@@ -426,8 +426,19 @@ export default class Observer {
     if (differences) {
       delete instance.differences
 
+      let sortedList = [ ]
+
       object.each(
         differences,
+        function (difference, keypath) {
+          array[
+            string.startsWith(keypath, '_') ? 'unshift' : 'push'
+          ](sortedList, difference)
+        }
+      )
+
+      array.each(
+        sortedList,
         function (difference) {
           let { keypath, oldValue } = difference, newValue = instance.get(keypath)
           if (difference.force || oldValue !== newValue) {
@@ -449,6 +460,7 @@ export default class Observer {
           }
         }
       )
+
     }
 
   }
