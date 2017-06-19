@@ -217,7 +217,6 @@ export default class Observer {
       data,
       cache,
       emitter,
-      differences,
       computedGetters,
       computedSetters,
       watchKeypaths,
@@ -388,10 +387,7 @@ export default class Observer {
             array.push(result, keypath)
           }
 
-          if (!differences) {
-            differences = instance.differences = { }
-          }
-
+          let differences = instance.differences || (instance.differences = { })
           differences[ keypath ] = task
 
         }
