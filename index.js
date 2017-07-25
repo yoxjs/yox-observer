@@ -371,15 +371,22 @@ export default class Observer {
       }
     )
 
+    let cacheKeys = object.keys(cache)
+
     array.each(
       tasks,
       function (task) {
 
         let { keypath, oldValue } = task
 
-        if (object.has(cache, keypath)) {
-          delete cache[ keypath ]
-        }
+        array.each(
+          cacheKeys,
+          function (key) {
+            if (string.startsWith(key, keypath)) {
+              delete cache[ key ]
+            }
+          }
+        )
 
         if (getNewValue(keypath) !== oldValue) {
 
