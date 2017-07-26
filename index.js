@@ -271,10 +271,33 @@ export default class Observer {
       return newCache[ keypath ]
     }
 
-    let matchDeps = function (key, keypath) {
+    let tasks = [ ], taskKeys = { }
+
+    let addTask = function (keypath) {
+      if (!taskKeys[ keypath ]) {
+        taskKeys[ keypath ] = env.TRUE
+        array.push(
+          tasks,
+          {
+            keypath,
+            oldValue: getOldValue(keypath),
+          }
+        )
+      }
+    }
+
+    /**
+     * 当一个值变化时（对应 keypath)
+     * 分析依赖它的那些数据是否发生了变化
+     *
+     * @param {string} keypath
+     * @param {string} testKey
+     * @return {?Array}
+     */
+    let testDeps = function (keypath, testKey) {
       let result
       array.each(
-        deps[ key ],
+        deps[ testKey ],
         function (dep) {
           if (isFuzzyKeypath(dep)) {
             result = matchKeypath(keypath, dep)
@@ -283,7 +306,7 @@ export default class Observer {
             result = keypathUtil.startsWith(dep, keypath)
           }
           if (!result && object.has(deps, dep)) {
-            result = matchDeps(dep, keypath)
+            result = testDeps(keypath, dep)
           }
           if (result) {
             return env.FALSE
@@ -293,7 +316,29 @@ export default class Observer {
       return result
     }
 
-    let tasks = [ ]
+    let depKeys = object.keys(deps)
+    let matchDeps = function (keypath) {
+
+      let hasFound
+
+      while (env.TRUE) {
+        hasFound = env.FALSE
+        array.each(
+          depKeys,
+          function (key) {
+            if (key !== keypath && !taskKeys[ key ] && testDeps(keypath, key)) {
+              hasFound = env.TRUE
+              addTask(key)
+              matchDeps(key)
+            }
+          }
+        )
+        if (!hasFound) {
+          break
+        }
+      }
+
+    }
 
     object.each(
       model,
@@ -304,13 +349,7 @@ export default class Observer {
         let oldValue = getOldValue(keypath)
         if (newValue !== oldValue) {
 
-          array.push(
-            tasks,
-            {
-              keypath,
-              oldValue,
-            }
-          )
+          addTask(keypath)
 
           if (watchKeypaths) {
             object.each(
@@ -319,32 +358,13 @@ export default class Observer {
                 if (key !== keypath
                   && keypathUtil.startsWith(key, keypath)
                 ) {
-                  array.push(
-                    tasks,
-                    {
-                      keypath: key,
-                      oldValue: getOldValue(key),
-                    }
-                  )
+                  addTask(key)
                 }
               }
             )
           }
 
-          object.each(
-            deps,
-            function (list, key) {
-              if (matchDeps(key, keypath)) {
-                array.push(
-                  tasks,
-                  {
-                    keypath: key,
-                    oldValue: getOldValue(key),
-                  }
-                )
-              }
-            }
-          )
+          matchDeps(keypath)
 
         }
 
@@ -379,14 +399,10 @@ export default class Observer {
 
         let { keypath, oldValue } = task
 
-        array.each(
-          cacheKeys,
-          function (key) {
-            if (string.startsWith(key, keypath)) {
-              delete cache[ key ]
-            }
-          }
-        )
+        // 清掉计算属性的缓存
+        if (object.has(cache, keypath)) {
+          delete cache[ keypath ]
+        }
 
         if (getNewValue(keypath) !== oldValue) {
 
@@ -396,6 +412,17 @@ export default class Observer {
 
           let differences = instance.differences || (instance.differences = { })
           differences[ keypath ] = task
+
+          array.each(
+            cacheKeys,
+            function (key) {
+              if (key !== keypath
+                && keypathUtil.startsWith(key, keypath)
+              ) {
+                delete cache[ key ]
+              }
+            }
+          )
 
         }
 
