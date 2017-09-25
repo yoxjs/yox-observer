@@ -8,8 +8,8 @@ import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
-import execute from 'yox-common/function/execute'
 import toNumber from 'yox-common/function/toNumber'
+import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
 export default class Observer {
@@ -30,9 +30,13 @@ export default class Observer {
 
     let instance = this
 
+    if (!context) {
+      context = instance
+    }
+
     instance.data = data || { }
     instance.emitter = new Emitter()
-    instance.context = context || instance
+    instance.context = context
 
     // 缓存历史数据，便于对比变化
     instance.cache = { }
@@ -98,7 +102,7 @@ export default class Observer {
                 computedStack.push([ ])
               }
 
-              let value = execute(get, instance.context)
+              let value = execute(get, context)
               cache[ keypath ] = value
 
               if (needDeps) {
@@ -116,7 +120,7 @@ export default class Observer {
 
           if (set) {
             instance.computedSetters[ keypath ] = function (value) {
-              set.call(instance.context, value)
+              set.call(context, value)
             }
           }
 
@@ -746,6 +750,9 @@ function createWatch(action) {
       watch(keypath, watcher, sync)
     }
     else {
+      if (watcher === env.TRUE) {
+        sync = watcher
+      }
       object.each(
         keypath,
         function (value, keypath) {
