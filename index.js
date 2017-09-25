@@ -756,12 +756,14 @@ function createWatch(action) {
       object.each(
         keypath,
         function (value, keypath) {
-          let watcher = value, sync
+          let watcher = value, innerSync = sync
           if (is.object(value)) {
             watcher = value.watcher
-            sync = value.sync
+            if (is.boolean(value.sync)) {
+              innerSync = value.sync
+            }
           }
-          watch(keypath, watcher, sync)
+          watch(keypath, watcher, innerSync)
         }
       )
     }
