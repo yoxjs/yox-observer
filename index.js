@@ -22,110 +22,108 @@ export default class Observer {
    */
   constructor(options) {
 
-    let {
-      data,
-      context,
-      computed,
-    } = options
-
     let instance = this
 
-    if (!context) {
-      context = instance
-    }
-
-    instance.data = data || { }
+    instance.data = options.data || { }
+    instance.context = options.context || instance
     instance.emitter = new Emitter()
-    instance.context = context
 
     // 缓存历史数据，便于对比变化
     instance.cache = { }
     // 谁依赖了谁
     instance.deps = { }
 
+    // 把计算属性拆为 getter 和 setter
+    instance.computedGetters = { }
+    instance.computedSetters = { }
+
+    // 辅助获取计算属性的依赖
+    instance.computedStack = [ ]
+
     // 计算属性也是数据
-    if (is.object(computed)) {
-
-      // 把计算属性拆为 getter 和 setter
-      instance.computedGetters = { }
-      instance.computedSetters = { }
-
-      // 辅助获取计算属性的依赖
-      instance.computedStack = [ ]
-
-      let {
-        cache,
-        computedStack,
-      } = instance
-
+    if (is.object(options.computed)) {
       object.each(
-        computed,
+        options.computed,
         function (item, keypath) {
-
-          let get, set, deps, cacheable = env.TRUE
-
-          if (is.func(item)) {
-            get = item
-          }
-          else if (is.object(item)) {
-            if (item.deps) {
-              deps = item.deps
-            }
-            if (is.boolean(item.cache)) {
-              cacheable = item.cache
-            }
-            if (is.func(item.get)) {
-              get = item.get
-            }
-            if (is.func(item.set)) {
-              set = item.set
-            }
-          }
-
-          if (get) {
-
-            let needDeps = cacheable
-            if (needDeps && deps) {
-              needDeps = env.FALSE
-              if (is.array(deps)) {
-                instance.setDeps(keypath, deps)
-              }
-            }
-
-            instance.computedGetters[ keypath ] = function () {
-
-              if (cacheable && object.has(cache, keypath)) {
-                return cache[ keypath ]
-              }
-
-              if (needDeps) {
-                computedStack.push([ ])
-              }
-
-              let value = execute(get, context)
-              cache[ keypath ] = value
-
-              if (needDeps) {
-                instance.setDeps(
-                  keypath,
-                  array.pop(computedStack)
-                )
-              }
-
-              return value
-
-            }
-
-          }
-
-          if (set) {
-            instance.computedSetters[ keypath ] = function (value) {
-              set.call(context, value)
-            }
-          }
-
+          instance.addComputed(keypath, item)
         }
       )
+    }
+
+  }
+
+  /**
+   * 添加计算属性
+   *
+   * @param {string} keypath
+   * @param {Function|Object} computed
+   */
+  addComputed(keypath, computed) {
+
+    let instance = this, cacheable = env.TRUE, get, set, deps
+
+    if (is.func(computed)) {
+      get = computed
+    }
+    else if (is.object(computed)) {
+      if (is.boolean(computed.cache)) {
+        cacheable = computed.cache
+      }
+      if (is.func(computed.get)) {
+        get = computed.get
+      }
+      if (is.func(computed.set)) {
+        set = computed.set
+      }
+      if (computed.deps) {
+        deps = computed.deps
+      }
+    }
+
+    if (get) {
+
+      let needDeps
+
+      if (deps) {
+        needDeps = env.FALSE
+        if (is.array(deps)) {
+          instance.setDeps(keypath, deps)
+        }
+      }
+      else {
+        needDeps = cacheable
+      }
+
+      instance.computedGetters[ keypath ] = function () {
+
+        if (cacheable && object.has(instance.cache, keypath)) {
+          return instance.cache[ keypath ]
+        }
+
+        if (needDeps) {
+          instance.computedStack.push([ ])
+        }
+
+        let value = execute(get, instance.context)
+        instance.cache[ keypath ] = value
+
+        if (needDeps) {
+          instance.setDeps(
+            keypath,
+            array.pop(instance.computedStack)
+          )
+        }
+
+        return value
+
+      }
+
+    }
+
+    if (set) {
+      instance.computedSetters[ keypath ] = function (value) {
+        set.call(instance.context, value)
+      }
     }
 
   }
@@ -134,60 +132,51 @@ export default class Observer {
    * 获取数据
    *
    * @param {string} keypath
-   * @param {*} defaultValue
+   * @param {?*} defaultValue
    * @return {?*}
    */
   get(keypath, defaultValue) {
 
     let instance = this, result
 
-    let {
-      data,
-      cache,
-      computedStack,
-      computedGetters,
-    } = instance
-
+    // 传入 '' 获取整个 data
     if (keypath === char.CHAR_BLANK) {
-      return data
+      return instance.data
     }
 
     keypath = keypathUtil.normalize(keypath)
 
-    if (computedStack) {
-      let list = array.last(computedStack)
-      if (list) {
-        array.push(list, keypath)
-      }
+    // 收集计算属性依赖
+    let list = array.last(instance.computedStack)
+    if (list) {
+      array.push(list, keypath)
     }
 
-    if (computedGetters) {
-      let { getter, prop } = matchBestGetter(computedGetters, keypath)
-      if (getter) {
-        getter = getter()
-        if (prop) {
-          if (object.exists(getter, prop)) {
-            result = { value: getter[ prop ] }
-          }
-          else if (!is.primitive(getter)) {
-            result = object.get(getter, prop)
-          }
+    let { getter, prop } = matchBestGetter(instance.computedGetters, keypath)
+    if (getter) {
+      getter = getter()
+      if (prop) {
+        if (object.exists(getter, prop)) {
+          result = { value: getter[ prop ] }
         }
-        else {
-          result = { value: getter }
+        else if (!is.primitive(getter)) {
+          result = object.get(getter, prop)
         }
+      }
+      else {
+        result = { value: getter }
       }
     }
 
     if (!result) {
-      result = object.get(data, keypath)
+      result = object.get(instance.data, keypath)
     }
 
     if (result) {
-      return cache[ keypath ] = result.value
+      return instance.cache[ keypath ] = result.value
     }
 
-    cache[ keypath ] = env.UNDEFINED
+    instance.cache[ keypath ] = env.UNDEFINED
     return defaultValue
 
   }
@@ -513,14 +502,8 @@ export default class Observer {
     }
   }
 
-  setDeps(keypath, newDeps) {
-
-    let { deps } = this
-    if (newDeps !== deps[ keypath ]) {
-      deps[ keypath ] = newDeps
-      this[ DIRTY ] = env.TRUE
-    }
-
+  setDeps(keypath, deps) {
+    this.deps[ keypath ] = deps
   }
 
   /**
@@ -693,9 +676,11 @@ object.extend(
      */
     unwatch: function (keypath, watcher) {
       let { emitter } = this
-      emitter.off(keypath, watcher)
-      if (!emitter.has(keypath)) {
-        this[ DIRTY ] = env.TRUE
+      if (emitter.has(keypath)) {
+        emitter.off(keypath, watcher)
+        if (!emitter.has(keypath)) {
+          this[ DIRTY ] = env.TRUE
+        }
       }
     }
 
@@ -704,50 +689,47 @@ object.extend(
 
 const DIRTY = '_dirty_'
 
-/**
- * watch 和 watchOnce 逻辑相同
- * 提出一个工厂方法
- */
+function watch(instance, action, keypath, watcher, sync) {
+
+  let { emitter, context, differences } = instance
+
+  if (!emitter.has(keypath)) {
+    instance[ DIRTY ] = env.TRUE
+  }
+
+  emitter[ action ](
+    keypath,
+    {
+      func: watcher,
+      context
+    }
+  )
+
+  if (sync && !isFuzzyKeypath(keypath)) {
+    if (differences) {
+      let difference = differences[ keypath ]
+      if (difference) {
+        difference.force = env.TRUE
+        return
+      }
+    }
+    execute(
+      watcher,
+      context,
+      [ instance.get(keypath), env.UNDEFINED, keypath ]
+    )
+  }
+
+}
+
 function createWatch(action) {
 
   return function (keypath, watcher, sync) {
 
     let instance = this
 
-    let watch = function (keypath, watcher, sync) {
-
-      let { emitter, context, differences } = instance
-      if (!emitter.has(keypath)) {
-        instance[ DIRTY ] = env.TRUE
-      }
-
-      emitter[ action ](
-        keypath,
-        {
-          func: watcher,
-          context
-        }
-      )
-
-      if (sync && !isFuzzyKeypath(keypath)) {
-        if (differences) {
-          let difference = differences[ keypath ]
-          if (difference) {
-            difference.force = env.TRUE
-            return
-          }
-        }
-        execute(
-          watcher,
-          context,
-          [ instance.get(keypath), env.UNDEFINED, keypath ]
-        )
-      }
-
-    }
-
     if (is.string(keypath)) {
-      watch(keypath, watcher, sync)
+      watch(instance, action, keypath, watcher, sync)
     }
     else {
       if (watcher === env.TRUE) {
@@ -763,7 +745,7 @@ function createWatch(action) {
               innerSync = value.sync
             }
           }
-          watch(keypath, watcher, innerSync)
+          watch(instance, action, keypath, watcher, innerSync)
         }
       )
     }

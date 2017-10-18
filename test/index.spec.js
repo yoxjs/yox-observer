@@ -11,14 +11,14 @@ describe('Observer', () => {
 
     observer.watch(
       'name1',
-      function (name1) {
+      function () {
         count1 = 1
       }
     )
 
     observer.watch(
       'name2',
-      function (name2) {
+      function () {
         count2 = 1
       },
       true
@@ -26,7 +26,7 @@ describe('Observer', () => {
 
     observer.watch({
       name3: {
-        watcher: function (name3) {
+        watcher: function () {
           count3 = 1
         }
       }
@@ -35,7 +35,7 @@ describe('Observer', () => {
     observer.watch({
       name4: {
         sync: true,
-        watcher: function (name4) {
+        watcher: function () {
           count4 = 1
         }
       }
@@ -95,6 +95,44 @@ describe('Observer', () => {
       expect(count).toBe(0)
       done()
     })
+
+  })
+
+  it('watch object property', () => {
+
+    let observer = new Observer({
+      data: {
+        user: {
+          name: 'yox',
+          age: 1
+        }
+      }
+    })
+
+    let count1 = 0
+    let watcher1 = function () {
+      count1++
+    }
+
+    let count2 = 0
+    let watcher2 = function () {
+      count2++
+    }
+
+    observer.watch('user.name', watcher1)
+    observer.watch('user.*', watcher2)
+    observer.set('user.name', 'yox1')
+
+    expect(count1).toBe(1)
+    expect(count2).toBe(1)
+
+    observer.set('user', {
+      name: 'yox2',
+      age: 2
+    })
+
+    expect(count1).toBe(2)
+    expect(count2).toBe(3)
 
   })
 
