@@ -98,7 +98,86 @@ describe('Observer', () => {
 
   })
 
-  it('watch object property', () => {
+  it('change computed data', done => {
+
+    let observer = new Observer({
+      data: {
+        a: 1,
+        b: 2,
+      },
+      computed: {
+        sum: function () {
+          return this.get('a') + this.get('b')
+        }
+      }
+    })
+
+    expect(observer.get('sum')).toBe(3)
+
+    let sum = 0, count = 0
+    observer.watch('sum', function (value) {
+      count++
+      sum = value
+    })
+
+    observer.set('a', 2)
+    observer.set('b', 3)
+
+    expect(sum).toBe(0)
+    expect(count).toBe(0)
+    expect(observer.get('sum')).toBe(5)
+
+    observer.nextTick(function () {
+      expect(sum).toBe(5)
+      expect(count).toBe(1)
+      done()
+    })
+
+  })
+
+  it('change computed fuzzy data', done => {
+
+    let observer = new Observer({
+      data: {
+        user: {
+          age1: 1,
+          age2: 2,
+        }
+      },
+      computed: {
+        sum: {
+          deps: ['user.*'],
+          get: function () {
+            return this.get('user.age1') + this.get('user.age2')
+          }
+        }
+      }
+    })
+
+    expect(observer.get('sum')).toBe(3)
+
+    let sum = 0, count = 0
+    observer.watch('sum', function (value) {
+      count++
+      sum = value
+    })
+
+    observer.set('user.age1', 2)
+    observer.set('user.age2', 3)
+
+    expect(sum).toBe(0)
+    expect(count).toBe(0)
+    expect(observer.get('sum')).toBe(5)
+
+    observer.nextTick(function () {
+      expect(sum).toBe(5)
+      expect(count).toBe(1)
+      done()
+    })
+
+  })
+
+  it('watch object property', done => {
 
     let observer = new Observer({
       data: {
@@ -123,20 +202,26 @@ describe('Observer', () => {
     observer.watch('user.*', watcher2)
     observer.set('user.name', 'yox1')
 
-    expect(count1).toBe(1)
-    expect(count2).toBe(1)
+    observer.nextTick(function () {
+      expect(count1).toBe(1)
+      expect(count2).toBe(1)
 
-    observer.set('user', {
-      name: 'yox2',
-      age: 2
+      observer.set('user', {
+        name: 'yox2',
+        age: 2
+      })
+
+      observer.nextTick(function () {
+        expect(count1).toBe(2)
+        expect(count2).toBe(3)
+        done()
+      })
+
     })
-
-    expect(count1).toBe(2)
-    expect(count2).toBe(3)
 
   })
 
-  it('simple dependency', () => {
+  it('simple dependency', done => {
 
     let observer = new Observer({
       data: {
@@ -174,43 +259,65 @@ describe('Observer', () => {
     let selectedList = observer.get('selectedList')
     expect(selectedList).toBe(observer.get('selectedList'))
 
-    observer.set('list.0.selected', false, true)
+    observer.set('list.0.selected', false)
 
-    expect(count1).toBe(1)
-    expect(selected1New).toBe(false)
-    expect(selected1Old).toBe(true)
-    expect(count2).toBe(1)
+    observer.nextTick(() => {
 
-    observer.set('list.0.selected', false, true)
 
-    expect(count1).toBe(1)
-    expect(selected1New).toBe(false)
-    expect(selected1Old).toBe(true)
-    expect(count2).toBe(1)
+      expect(count1).toBe(1)
+      expect(selected1New).toBe(false)
+      expect(selected1Old).toBe(true)
+      expect(count2).toBe(1)
 
-    observer.set('list.0.selected', true, true)
+      observer.set('list.0.selected', false)
 
-    expect(count1).toBe(2)
-    expect(selected1New).toBe(true)
-    expect(selected1Old).toBe(false)
-    expect(count2).toBe(2)
+      observer.nextTick(() => {
 
-    observer.set('list', [
-      { id: 1, selected: false },
-      { id: 2, selected: false },
-      { id: 3, selected: false },
-      { id: 4, selected: false },
-    ], true)
+        expect(count1).toBe(1)
+        expect(selected1New).toBe(false)
+        expect(selected1Old).toBe(true)
+        expect(count2).toBe(1)
 
-    expect(count1).toBe(3)
-    expect(selected1New).toBe(false)
-    expect(selected1Old).toBe(true)
-    expect(count2).toBe(3)
+        observer.set('list.0.selected', true)
+
+        observer.nextTick(() => {
+
+          expect(count1).toBe(2)
+          expect(selected1New).toBe(true)
+          expect(selected1Old).toBe(false)
+          expect(count2).toBe(2)
+
+          observer.set('list', [
+            { id: 1, selected: false },
+            { id: 2, selected: false },
+            { id: 3, selected: false },
+            { id: 4, selected: false },
+          ])
+
+          observer.nextTick(() => {
+            expect(count1).toBe(3)
+            expect(selected1New).toBe(false)
+            expect(selected1Old).toBe(true)
+            expect(count2).toBe(3)
+            done()
+          })
+
+
+        })
+
+
+
+      })
+
+
+
+    })
+
 
   })
 
 
-  it('complex dependency', () => {
+  it('complex dependency', done => {
 
     let observer = new Observer({
       data: {
@@ -225,13 +332,9 @@ describe('Observer', () => {
         selectedList: {
           deps: ['list', 'list.*.selected'],
           get: function () {
-            let result = [ ]
-            this.get('list').forEach(item => {
-              if (item.selected) {
-                result.push(item)
-              }
+            return this.get('list').filter(item => {
+              return item.selected
             })
-            return result
           }
         },
         sortedSelectedList: {
@@ -271,20 +374,25 @@ describe('Observer', () => {
       sortedSelectedListOld = oldValue
     })
 
-    observer.set('list.0.selected', false, true)
-    expect(list0Count).toBe(1)
-    expect(list0SelectedNew).toBe(false)
-    expect(list0SelectedOld).toBe(true)
+    observer.set('list.0.selected', false)
+    observer.nextTick(() => {
+      expect(list0Count).toBe(1)
+      expect(list0SelectedNew).toBe(false)
+      expect(list0SelectedOld).toBe(true)
 
-    expect(selectedListCount).toBe(1)
-    expect(Array.isArray(selectedListNew)).toBe(true)
-    expect(Array.isArray(selectedListOld)).toBe(true)
-    expect(selectedListNew).not.toBe(selectedListOld)
+      expect(selectedListCount).toBe(1)
+      expect(Array.isArray(selectedListNew)).toBe(true)
+      expect(Array.isArray(selectedListOld)).toBe(true)
+      expect(selectedListNew).not.toBe(selectedListOld)
 
-    expect(sortedSelectedListCount).toBe(1)
-    expect(Array.isArray(sortedSelectedListNew)).toBe(true)
-    expect(Array.isArray(sortedSelectedListOld)).toBe(true)
-    expect(sortedSelectedListNew).not.toBe(sortedSelectedListOld)
+      expect(sortedSelectedListCount).toBe(1)
+      expect(Array.isArray(sortedSelectedListNew)).toBe(true)
+      expect(Array.isArray(sortedSelectedListOld)).toBe(true)
+      expect(sortedSelectedListNew).not.toBe(sortedSelectedListOld)
+      done()
+    })
+
+
 
   })
 

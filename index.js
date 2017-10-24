@@ -28,17 +28,27 @@ export default class Observer {
     instance.context = options.context || instance
     instance.emitter = new Emitter()
 
-    // 缓存历史数据，便于对比变化
-    instance.cache = { }
     // 谁依赖了谁
     instance.deps = { }
+    // 谁被谁依赖
+    instance.invertedDeps = { }
+    // 谁被谁依赖
+    instance.invertedFuzzyDeps = { }
 
     // 把计算属性拆为 getter 和 setter
     instance.computedGetters = { }
     instance.computedSetters = { }
 
+    // 计算属性的缓存值
+    instance.computedCache = { }
+
     // 辅助获取计算属性的依赖
     instance.computedStack = [ ]
+
+    // 正在监听的 keypath
+    instance.watchKeypaths = { }
+    // 模糊监听，如 user.*
+    instance.watchFuzzyKeypaths = { }
 
     // 计算属性也是数据
     if (is.object(options.computed)) {
@@ -60,14 +70,14 @@ export default class Observer {
    */
   addComputed(keypath, computed) {
 
-    let instance = this, cacheable = env.TRUE, get, set, deps
+    let instance = this, cache = env.TRUE, get, set, deps
 
     if (is.func(computed)) {
       get = computed
     }
     else if (is.object(computed)) {
       if (is.boolean(computed.cache)) {
-        cacheable = computed.cache
+        cache = computed.cache
       }
       if (is.func(computed.get)) {
         get = computed.get
@@ -91,13 +101,13 @@ export default class Observer {
         }
       }
       else {
-        needDeps = cacheable
+        needDeps = cache
       }
 
       instance.computedGetters[ keypath ] = function () {
 
-        if (cacheable && object.has(instance.cache, keypath)) {
-          return instance.cache[ keypath ]
+        if (cache && object.has(instance.computedCache, keypath)) {
+          return instance.computedCache[ keypath ]
         }
 
         if (needDeps) {
@@ -105,7 +115,7 @@ export default class Observer {
         }
 
         let value = execute(get, instance.context)
-        instance.cache[ keypath ] = value
+        instance.computedCache[ keypath ] = value
 
         if (needDeps) {
           instance.setDeps(
@@ -172,12 +182,7 @@ export default class Observer {
       result = object.get(instance.data, keypath)
     }
 
-    if (result) {
-      return instance.cache[ keypath ] = result.value
-    }
-
-    instance.cache[ keypath ] = env.UNDEFINED
-    return defaultValue
+    return result ? result.value : defaultValue
 
   }
 
@@ -190,245 +195,213 @@ export default class Observer {
    */
   set(keypath, value, sync) {
 
-    let model, result = [ ]
-    if (is.string(keypath)) {
-      model = { }
-      model[ keypath ] = value
-    }
-    else if (is.object(keypath)) {
-      model = keypath
-      sync = value
-    }
-    else {
-      return result
-    }
+    let instance = this, { differences } = instance, outerDifferences = { }
 
-    let instance = this
+    // 数据监听有两种
+    // 1. 类似计算属性的依赖关系，如计算属性 A 的依赖是 B 和 C，当 B 或 C 变了，必须检测 A 是否变了
+    // 2. watch/watchOnce，只监听单一 keypath 的变化
+    //
+    // 当我们修改一项数据时
+    // 如果是基本类型的数据，需要判断是否有 watcher 正在监听它，以及它是否命中模糊匹配，以及它是否是别的数据的依赖
+    // 如果是引用类型的数据，除了有基本类型的判断，还得判断它的属性是否变化，如监听 user.name，修改了 user，也得判断 user.name 是否变化，此外，子属性的变化又会带来一次递归判断
+    //
+    // 一旦数据发生变化，如果它影响了计算属性，则需立即清除计算属性的缓存，才可获取最新值
+    // 而 watcher 的触发则需等到 nextTick 后
+    // 也就是说，你必须在设值时知道它会导致哪些数据发生变化，而不是在 nextTick 批量计算
 
-    let {
-      deps,
-      data,
-      cache,
-      emitter,
-      computedGetters,
-      computedSetters,
-      watchKeypaths,
-      watchFuzzyKeypaths,
-    } = instance
-
-    if (instance[ DIRTY ]) {
-
-      delete instance[ DIRTY ]
-
-      watchKeypaths = instance.watchKeypaths = { }
-      watchFuzzyKeypaths = instance.watchFuzzyKeypaths = { }
-
+    let addInverted = function (differences, inverted) {
       object.each(
-        emitter.listeners,
-        function (list, key) {
-          if (isFuzzyKeypath(key)) {
-            watchFuzzyKeypaths[ key ] = env.TRUE
-          }
-          else {
-            watchKeypaths[ key ] = env.TRUE
-          }
+        inverted,
+        function (count, invertedKeypath) {
+          addDifference(differences, invertedKeypath, env.UNDEFINED, instance.get(invertedKeypath), env.TRUE)
         }
       )
-
     }
 
-    /**
-     * 修改数据分 3 步：
-     *
-     * 1. 预分析所有潜在的 watch 字段，并提取出 oldValue
-     * 2. 设值
-     * 3. 遍历第一步收集的所有 watch 字段，并提取出 newValue 进行对比
-     */
+    let addDifference = function (differences, keypath, newValue, oldValue, force) {
+      if (force || oldValue !== newValue) {
+        // 自己
+        differences[ keypath ] = oldValue
 
-    let oldCache = { }
-    let getOldValue = function (keypath) {
-      if (!object.has(oldCache, keypath)) {
-        oldCache[ keypath ] =
-        object.has(cache, keypath)
-          ? cache[ keypath ]
-          : instance.get(keypath)
-      }
-      return oldCache[ keypath ]
-    }
-
-    let newCache = { }
-    let getNewValue = function (keypath) {
-      if (!object.has(newCache, keypath)) {
-        newCache[ keypath ] = instance.get(keypath)
-      }
-      return newCache[ keypath ]
-    }
-
-    let tasks = [ ], taskKeys = { }
-
-    let addTask = function (keypath) {
-      if (!taskKeys[ keypath ]) {
-        taskKeys[ keypath ] = env.TRUE
-        array.push(
-          tasks,
-          {
-            keypath,
-            oldValue: getOldValue(keypath),
-          }
-        )
-      }
-    }
-
-    /**
-     * 当一个值变化时（对应 keypath)
-     * 分析依赖它的那些数据是否发生了变化
-     *
-     * @param {string} keypath
-     * @param {string} testKey
-     * @return {?Array}
-     */
-    let testDeps = function (keypath, testKey) {
-      let result
-      array.each(
-        deps[ testKey ],
-        function (dep) {
-          if (isFuzzyKeypath(dep)) {
-            result = matchKeypath(keypath, dep)
-          }
-          else {
-            result = keypathUtil.startsWith(dep, keypath)
-          }
-          if (!result && object.has(deps, dep)) {
-            result = testDeps(keypath, dep)
-          }
-          if (result) {
-            return env.FALSE
-          }
+        // 依赖
+        let inverted = instance.invertedDeps[ keypath ]
+        if (inverted) {
+          addInverted(differences, inverted)
         }
-      )
-      return result
-    }
 
-    let depKeys = object.keys(deps)
-    let matchDeps = function (keypath) {
-
-      let hasFound
-
-      while (env.TRUE) {
-        hasFound = env.FALSE
-        array.each(
-          depKeys,
-          function (key) {
-            if (key !== keypath && !taskKeys[ key ] && testDeps(keypath, key)) {
-              hasFound = env.TRUE
-              addTask(key)
-              matchDeps(key)
+        object.each(
+          instance.invertedFuzzyDeps,
+          function (inverted, pattern) {
+            if (matchKeypath(keypath, pattern)) {
+              addInverted(differences, inverted)
             }
           }
         )
-        if (!hasFound) {
-          break
-        }
-      }
 
-    }
-
-    object.each(
-      model,
-      function (newValue, keypath) {
-
-        keypath = keypathUtil.normalize(keypath)
-
-        let oldValue = getOldValue(keypath)
-        if (newValue !== oldValue) {
-
-          addTask(keypath)
-
-          if (watchKeypaths) {
-            object.each(
-              watchKeypaths,
-              function (value, key) {
-                if (key !== keypath
-                  && keypathUtil.startsWith(key, keypath)
-                ) {
-                  addTask(key)
+        // 子属性
+        let oldIsObject = is.object(oldValue), newIsObject = newIsObject
+        if (oldIsObject || newIsObject) {
+          let keys
+          if (oldIsObject) {
+            keys = object.keys(oldValue)
+            if (newIsObject) {
+              array.each(
+                object.keys(newValue),
+                function (key) {
+                  if (!array.has(keys, key)) {
+                    array.push(keys, key)
+                  }
                 }
+              )
+            }
+          }
+          else {
+            keys = object.keys(newValue)
+          }
+          if (keys) {
+            array.each(
+              keys,
+              function (key) {
+                addDifference(
+                  differences,
+                  keypathUtil.join(keypath, key),
+                  newIsObject ? newValue[ key ] : env.UNDEFINED,
+                  oldIsObject ? oldValue[ key ] : env.UNDEFINED
+                )
               }
             )
           }
-
-          matchDeps(keypath)
-
         }
+        else {
+          let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
+          if (oldIsArray || newIsArray) {
+            let oldLength = oldIsArray ? oldValue.length : 0, newLength = newIsArray ? newValue.length : 0
+            for (let i = 0, len = Math.max(oldLength, newLength); i < len; i++) {
+              addDifference(
+                differences,
+                keypathUtil.join(keypath, i),
+                newIsArray ? newValue[ i ] : env.UNDEFINED,
+                oldIsArray ? oldValue[ i ] : env.UNDEFINED
+              )
+            }
+          }
+        }
+      }
+    }
 
-        if (computedSetters) {
-          let setter = computedSetters[ keypath ]
-          if (setter) {
-            setter(newValue)
+    let setValue = function (newValue, keypath) {
+
+      keypath = keypathUtil.normalize(keypath)
+
+      let oldValue = instance.get(keypath), innerDifferences = { }
+
+      addDifference(innerDifferences, keypath, newValue, oldValue)
+
+      let setter = instance.computedSetters[ keypath ]
+      if (setter) {
+        setter(newValue)
+      }
+      else {
+        let { getter, prop } = matchBestGetter(instance.computedGetters, keypath)
+        if (getter && prop) {
+          getter = getter()
+          if (is.primitive(getter)) {
             return
           }
           else {
-            let { getter, prop } = matchBestGetter(computedGetters, keypath)
-            if (getter && prop) {
-              getter = getter()
-              if (!is.primitive(getter)) {
-                object.set(getter, prop, newValue)
-              }
-              return
-            }
+            object.set(getter, prop, newValue)
           }
         }
+        else {
+          object.set(instance.data, keypath, newValue)
+        }
+      }
 
-        object.set(data, keypath, newValue)
+      if (newValue !== oldValue) {
+
+        let computedKeypaths = object.keys(instance.computedCache)
+
+        object.each(
+          innerDifferences,
+          function (oldValue, keypath) {
+            if (oldValue !== instance.get(keypath)) {
+              outerDifferences[ keypath ] = oldValue
+
+              let invertedKeypaths = instance.invertedDeps[ keypath ]
+              let invertedFuzzyKeypaths = [ ]
+
+              object.each(
+                instance.invertedFuzzyDeps,
+                function (invertedKeypaths, fuzzyKeypath) {
+                  if (matchKeypath(keypath, fuzzyKeypath)) {
+                    array.push(invertedFuzzyKeypaths, fuzzyKeypath)
+                  }
+                }
+              )
+
+              // 计算属性要立即生效，否则取值会出问题
+              array.each(
+                computedKeypaths,
+                function (computedKeypath, index) {
+                  let needRemove
+                  if (computedKeypath === keypath
+                    || invertedKeypaths && invertedKeypaths[ computedKeypath ]
+                  ) {
+                    needRemove = env.TRUE
+                  }
+                  else {
+                    array.each(
+                      invertedFuzzyKeypaths,
+                      function (fuzzyKeypath) {
+                        if (instance.invertedFuzzyDeps[ fuzzyKeypath ][ computedKeypath ]) {
+                          needRemove = env.TRUE
+                          return env.FALSE
+                        }
+                      }
+                    )
+                  }
+                  if (needRemove) {
+                    computedKeypaths.splice(index, 1)
+                    delete instance.computedCache[ computedKeypath ]
+                  }
+                },
+                env.TRUE
+              )
+
+            }
+          }
+        )
 
       }
-    )
 
-    let cacheKeys = object.keys(cache)
+    }
 
-    array.each(
-      tasks,
-      function (task) {
+    if (is.string(keypath)) {
+      setValue(value, keypath)
+    }
+    else if (is.object(keypath)) {
+      object.each(keypath, setValue)
+    }
 
-        let { keypath, oldValue } = task
+    let result = [ ]
 
-        // 清掉计算属性的缓存
-        if (object.has(cache, keypath)) {
-          delete cache[ keypath ]
-        }
-
-        if (getNewValue(keypath) !== oldValue) {
-
-          if (!array.has(result, keypath)) {
-            array.push(result, keypath)
+    object.each(
+      outerDifferences,
+      function (oldValue, keypath) {
+        if (oldValue !== instance.get(keypath)) {
+          array.push(result, keypath)
+          if (!differences) {
+            differences = instance.differences = { }
           }
-
-          let differences = instance.differences || (instance.differences = { })
-          differences[ keypath ] = task
-
-          array.each(
-            cacheKeys,
-            function (key) {
-              if (key !== keypath
-                && keypathUtil.startsWith(key, keypath)
-              ) {
-                delete cache[ key ]
-              }
-            }
-          )
-
+          if (!object.has(differences, keypath)) {
+            differences[ keypath ] = oldValue
+          }
         }
-
       }
     )
 
     if (result.length) {
-      if (sync) {
-        instance.flush()
-      }
-      else {
-        instance.flushAsync()
-      }
+      instance.flushAsync()
     }
 
     return result
@@ -443,48 +416,42 @@ export default class Observer {
       delete instance.pending
     }
 
-    // 冻结这批变化
-    // 避免 fire 之后同步再次走进这里
-    let { emitter, differences, watchFuzzyKeypaths } = instance
+    let { differences } = instance
+
     if (differences) {
       delete instance.differences
-
-      let sortedList = [ ]
-
-      object.each(
-        differences,
-        function (difference, keypath) {
-          array[
-            string.startsWith(keypath, '_') ? 'unshift' : 'push'
-          ](sortedList, difference)
-        }
-      )
-
-      array.each(
-        sortedList,
-        function (difference) {
-          let { keypath, oldValue } = difference, newValue = instance.get(keypath)
-          if (difference.force || oldValue !== newValue) {
-            let args = [ newValue, oldValue, keypath ]
-            emitter.fire(keypath, args)
-            if (watchFuzzyKeypaths) {
-              object.each(
-                watchFuzzyKeypaths,
-                function (value, key) {
-                  let match = matchKeypath(keypath, key)
-                  if (match) {
-                    let newArgs = object.copy(args)
-                    array.push(newArgs, match)
-                    emitter.fire(key, newArgs)
-                  }
-                }
-              )
-            }
-          }
-        }
-      )
-
     }
+    else {
+      return
+    }
+
+    object.each(
+      differences,
+      function (oldValue, keypath) {
+
+        let newValue = instance.get(keypath)
+
+        if (oldValue !== newValue) {
+
+          let args = [ newValue, oldValue, keypath ]
+          instance.emitter.fire(keypath, args)
+
+          object.each(
+            instance.watchFuzzyKeypaths,
+            function (value, key) {
+              let match = matchKeypath(keypath, key)
+              if (match) {
+                let newArgs = object.copy(args)
+                array.push(newArgs, match)
+                instance.emitter.fire(key, newArgs)
+              }
+            }
+          )
+
+        }
+
+      }
+    )
 
   }
 
@@ -502,8 +469,116 @@ export default class Observer {
     }
   }
 
-  setDeps(keypath, deps) {
-    this.deps[ keypath ] = deps
+  setDeps(keypath, value) {
+    let { deps, invertedDeps, invertedFuzzyDeps } = this
+    let oldValue = deps[ keypath ]
+    if (oldValue !== value) {
+
+      let added = [ ], removed = [ ]
+
+      if (oldValue) {
+        array.each(
+          [ oldValue, value ],
+          function (deps) {
+            array.each(
+              deps,
+              function (dep) {
+                if (array.has(value, dep)) {
+                  if (!array.has(oldValue, dep)) {
+                    array.push(added, dep)
+                  }
+                }
+                else if (array.has(oldValue, dep)) {
+                  array.push(removed, dep)
+                }
+              }
+            )
+          }
+        )
+      }
+      else {
+        added = value
+      }
+
+      if (removed.length) {
+
+        let remove = function (dep, keypath) {
+
+          let isFuzzy = isFuzzyKeypath(dep)
+          let deps = isFuzzy ? invertedFuzzyDeps : invertedDeps
+
+          let target = deps[ dep ]
+          if (target[ keypath ] > 0) {
+            target[ keypath ]--
+            if (deps[ keypath ]) {
+              object.each(
+                deps[ keypath ],
+                function (count, key) {
+                  remove(dep, key)
+                }
+              )
+            }
+          }
+
+          if (!target[ keypath ]) {
+            delete target[ keypath ]
+          }
+
+        }
+
+        array.each(
+          removed,
+          function (dep) {
+            remove(dep, keypath)
+          }
+        )
+
+      }
+
+      if (added.length) {
+
+        let add = function (dep, keypath, autoCreate) {
+
+          let isFuzzy = isFuzzyKeypath(dep)
+          let deps = isFuzzy ? invertedFuzzyDeps : invertedDeps
+
+          // dep 是 keypath 的一个依赖
+          let target = deps[ dep ]
+          if (!target && autoCreate) {
+            target = deps[ dep ] = { }
+          }
+          if (target) {
+            if (is.number(target[ keypath ])) {
+              target[ keypath ]++
+            }
+            else {
+              target[ keypath ] = 1
+            }
+            // dep 同样是 keypath 的父级的依赖
+            if (deps[ keypath ]) {
+              object.each(
+                deps[ keypath ],
+                function (count, key) {
+                  add(dep, key)
+                }
+              )
+            }
+          }
+        }
+
+        array.each(
+          added,
+          function (dep) {
+            add(dep, keypath, env.TRUE)
+          }
+        )
+
+      }
+
+      deps[ keypath ] = value
+
+    }
+
   }
 
   /**
@@ -675,37 +750,47 @@ object.extend(
      * @param {?Function} watcher
      */
     unwatch: function (keypath, watcher) {
-      let { emitter } = this
-      if (emitter.has(keypath)) {
-        emitter.off(keypath, watcher)
-        if (!emitter.has(keypath)) {
-          this[ DIRTY ] = env.TRUE
-        }
+      let instance = this
+      if (is.string(keypath)) {
+        unwatch(instance, keypath, watcher)
+      }
+      else if (is.object(keypath)) {
+        object.each(
+          keypath,
+          function (watcher, keypath) {
+            unwatch(instance, keypath, watcher)
+          }
+        )
       }
     }
 
   }
 )
 
-const DIRTY = '_dirty_'
-
 function watch(instance, action, keypath, watcher, sync) {
 
   let { emitter, context, differences } = instance
 
+  let isFuzzy = isFuzzyKeypath(keypath)
+
   if (!emitter.has(keypath)) {
-    instance[ DIRTY ] = env.TRUE
+    if (isFuzzy) {
+      instance.watchFuzzyKeypaths[ keypath ] = env.TRUE
+    }
+    else {
+      instance.watchKeypaths[ keypath ] = env.TRUE
+    }
   }
 
   emitter[ action ](
     keypath,
     {
       func: watcher,
-      context
+      context,
     }
   )
 
-  if (sync && !isFuzzyKeypath(keypath)) {
+  if (sync && !isFuzzy) {
     if (differences) {
       let difference = differences[ keypath ]
       if (difference) {
@@ -722,6 +807,20 @@ function watch(instance, action, keypath, watcher, sync) {
 
 }
 
+function unwatch(instance, keypath, watcher) {
+  let { emitter } = instance
+  if (emitter.has(keypath)) {
+    emitter.off(keypath, watcher)
+    if (!emitter.has(keypath)) {
+      if (isFuzzyKeypath(keypath)) {
+        delete instance.watchFuzzyKeypaths[ keypath ]
+      }
+      else {
+        delete instance.watchKeypaths[ keypath ]
+      }
+    }
+  }
+}
 function createWatch(action) {
 
   return function (keypath, watcher, sync) {
