@@ -447,7 +447,8 @@ export default class Observer {
 
     execute(
       instance.beforeFlush,
-      instance
+      instance,
+      differences
     )
 
     object.each(
@@ -480,7 +481,8 @@ export default class Observer {
 
     execute(
       instance.afterFlush,
-      instance
+      instance,
+      differences
     )
 
   }
