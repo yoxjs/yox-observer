@@ -19,6 +19,8 @@ export default class Observer {
    * @property {Object} options.data
    * @property {?Object} options.computed
    * @property {?*} options.context 执行 watcher 函数的 this 指向
+   * @property {?Function} options.beforeFlush
+   * @property {?Function} options.afterFlush
    */
   constructor(options) {
 
@@ -27,6 +29,8 @@ export default class Observer {
     instance.data = options.data || { }
     instance.context = options.context || instance
     instance.emitter = new Emitter()
+    instance.beforeFlush = options.beforeFlush
+    instance.afterFlush = options.afterFlush
 
     // 谁依赖了谁
     instance.deps = { }
@@ -441,6 +445,11 @@ export default class Observer {
       return
     }
 
+    execute(
+      instance.beforeFlush,
+      instance
+    )
+
     object.each(
       differences,
       function (oldValue, keypath) {
@@ -467,6 +476,11 @@ export default class Observer {
         }
 
       }
+    )
+
+    execute(
+      instance.afterFlush,
+      instance
     )
 
   }
