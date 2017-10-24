@@ -195,7 +195,7 @@ export default class Observer {
    */
   set(keypath, value, sync) {
 
-    let instance = this, { differences } = instance, outerDifferences = { }
+    let instance = this, outerDifferences = { }
 
     // 数据监听有两种
     // 1. 类似计算属性的依赖关系，如计算属性 A 的依赖是 B 和 C，当 B 或 C 变了，必须检测 A 是否变了
@@ -231,8 +231,8 @@ export default class Observer {
 
         object.each(
           instance.invertedFuzzyDeps,
-          function (inverted, pattern) {
-            if (matchKeypath(keypath, pattern)) {
+          function (inverted, fuzzyKeypath) {
+            if (matchKeypath(keypath, fuzzyKeypath)) {
               addInverted(differences, inverted)
             }
           }
@@ -275,8 +275,24 @@ export default class Observer {
         else {
           let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
           if (oldIsArray || newIsArray) {
-            let oldLength = oldIsArray ? oldValue.length : 0, newLength = newIsArray ? newValue.length : 0
-            for (let i = 0, len = Math.max(oldLength, newLength); i < len; i++) {
+            let oldLength = oldIsArray ? oldValue.length : env.UNDEFINED, newLength = newIsArray ? newValue.length : env.UNDEFINED
+            addDifference(
+              differences,
+              keypathUtil.join(keypath, 'length'),
+              newLength,
+              oldLength
+            )
+            let length
+            if (oldIsArray) {
+              length = oldLength
+              if (newLength > oldLength) {
+                length = newLength
+              }
+            }
+            else {
+              length = newLength
+            }
+            for (let i = 0; i < length; i++) {
               addDifference(
                 differences,
                 keypathUtil.join(keypath, i),
@@ -383,7 +399,7 @@ export default class Observer {
       object.each(keypath, setValue)
     }
 
-    let result = [ ]
+    let result = [ ], { differences } = instance
 
     object.each(
       outerDifferences,
