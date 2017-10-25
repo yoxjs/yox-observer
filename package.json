@@ -1,6 +1,6 @@
 {
   "name": "yox-observer",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {

@@ -242,7 +242,7 @@ export default class Observer {
         )
 
         // 子属性
-        let oldIsObject = is.object(oldValue), newIsObject = newIsObject
+        let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
         if (oldIsObject || newIsObject) {
           let keys
           if (oldIsObject) {
