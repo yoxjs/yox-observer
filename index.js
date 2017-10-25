@@ -195,9 +195,8 @@ export default class Observer {
    *
    * @param {string|Object} keypath
    * @param {?*} value
-   * @param {?boolean} sync
    */
-  set(keypath, value, sync) {
+  set(keypath, value) {
 
     let instance = this, outerDifferences = { }
 
@@ -286,17 +285,7 @@ export default class Observer {
               newLength,
               oldLength
             )
-            let length
-            if (oldIsArray) {
-              length = oldLength
-              if (newLength > oldLength) {
-                length = newLength
-              }
-            }
-            else {
-              length = newLength
-            }
-            for (let i = 0; i < length; i++) {
+            for (let i = 0, length = getMax(newLength, oldLength); i < length; i++) {
               addDifference(
                 differences,
                 keypathUtil.join(keypath, i),
@@ -801,7 +790,7 @@ object.extend(
 
 function watch(instance, action, keypath, watcher, sync) {
 
-  let { emitter, context, differences } = instance
+  let { emitter, context } = instance
 
   let isFuzzy = isFuzzyKeypath(keypath)
 
@@ -823,13 +812,6 @@ function watch(instance, action, keypath, watcher, sync) {
   )
 
   if (sync && !isFuzzy) {
-    if (differences) {
-      let difference = differences[ keypath ]
-      if (difference) {
-        difference.force = env.TRUE
-        return
-      }
-    }
     execute(
       watcher,
       context,
@@ -853,6 +835,7 @@ function unwatch(instance, keypath, watcher) {
     }
   }
 }
+
 function createWatch(action) {
 
   return function (keypath, watcher, sync) {
@@ -944,4 +927,25 @@ function matchBestGetter(getters, keypath) {
 
   return result
 
+}
+
+/**
+ * 获取最大值
+ *
+ * @param {number|undefined} a
+ * @param {number|undefined} b
+ * @return {number}
+ */
+function getMax(a, b) {
+  let max
+  if (a >= 0) {
+    max = a
+    if (b > a) {
+      max = b
+    }
+  }
+  else if (b >= 0) {
+    max = b
+  }
+  return max
 }

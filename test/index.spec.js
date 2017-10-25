@@ -98,6 +98,69 @@ describe('Observer', () => {
 
   })
 
+  it('simple undo', done => {
+
+    let observer = new Observer({
+      data: {
+        name: 1
+      }
+    })
+
+    let count = 0
+    let watcher = function () {
+      count++
+    }
+
+    observer.watch('name', watcher)
+    observer.set('name', 2)
+    observer.set('name', 1)
+
+    expect(count).toBe(0)
+
+    observer.nextTick(function () {
+      expect(count).toBe(0)
+      done()
+    })
+
+  })
+
+  it('complex undo', done => {
+
+    let observer = new Observer({
+      data: {
+        a: 1,
+        b: 2,
+      },
+      computed: {
+        sum: function () {
+          return this.get('a') + this.get('b')
+        }
+      }
+    })
+
+    let count = 0
+    let watcher = function () {
+      count++
+    }
+
+    observer.watch('sum', watcher)
+    observer.set('a', 2)
+    observer.set('b', 3)
+
+    expect(observer.get('sum')).toBe(5)
+    expect(count).toBe(0)
+
+    observer.set('a', 1)
+    observer.set('b', 2)
+
+    observer.nextTick(function () {
+      expect(observer.get('sum')).toBe(3)
+      expect(count).toBe(0)
+      done()
+    })
+
+  })
+
   it('change computed data', done => {
 
     let observer = new Observer({
