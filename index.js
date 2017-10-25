@@ -434,36 +434,42 @@ export default class Observer {
       return
     }
 
-    execute(
-      instance.beforeFlush,
-      instance,
-      differences
-    )
+    // 确定待 flush 的数据
+    let flushing = { }
 
     object.each(
       differences,
       function (oldValue, keypath) {
-
         let newValue = instance.get(keypath)
-
         if (oldValue !== newValue) {
-
-          let args = [ newValue, oldValue, keypath ]
-          instance.emitter.fire(keypath, args)
-
-          object.each(
-            instance.watchFuzzyKeypaths,
-            function (value, key) {
-              let match = matchKeypath(keypath, key)
-              if (match) {
-                let newArgs = object.copy(args)
-                array.push(newArgs, match)
-                instance.emitter.fire(key, newArgs)
-              }
-            }
-          )
-
+          flushing[ keypath ] = [ newValue, oldValue, keypath ]
         }
+      }
+    )
+
+    execute(
+      instance.beforeFlush,
+      instance,
+      flushing
+    )
+
+    object.each(
+      flushing,
+      function (args, keypath) {
+
+        instance.emitter.fire(keypath, args)
+
+        object.each(
+          instance.watchFuzzyKeypaths,
+          function (value, key) {
+            let match = matchKeypath(keypath, key)
+            if (match) {
+              let newArgs = object.copy(args)
+              array.push(newArgs, match)
+              instance.emitter.fire(key, newArgs)
+            }
+          }
+        )
 
       }
     )
@@ -471,7 +477,7 @@ export default class Observer {
     execute(
       instance.afterFlush,
       instance,
-      differences
+      flushing
     )
 
   }
