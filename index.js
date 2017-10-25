@@ -333,7 +333,8 @@ export default class Observer {
         object.each(
           innerDifferences,
           function (oldValue, keypath) {
-            if (oldValue !== instance.get(keypath)) {
+            let newValue = instance.get(keypath)
+            if (isChange(newValue, oldValue, instance.deps[ keypath ])) {
               outerDifferences[ keypath ] = oldValue
 
               let invertedKeypaths = instance.invertedDeps[ keypath ]
@@ -397,7 +398,8 @@ export default class Observer {
     object.each(
       outerDifferences,
       function (oldValue, keypath) {
-        if (oldValue !== instance.get(keypath)) {
+        let newValue = instance.get(keypath)
+        if (isChange(newValue, oldValue, instance.deps[ keypath ])) {
           array.push(result, keypath)
           if (!differences) {
             differences = instance.differences = { }
@@ -441,7 +443,7 @@ export default class Observer {
       differences,
       function (oldValue, keypath) {
         let newValue = instance.get(keypath)
-        if (oldValue !== newValue) {
+        if (isChange(newValue, oldValue, instance.deps[ keypath ])) {
           flushing[ keypath ] = [ newValue, oldValue, keypath ]
         }
       }
@@ -954,4 +956,20 @@ function getMax(a, b) {
     max = b
   }
   return max
+}
+
+/**
+ * 新旧值变化有两种情况：
+ *
+ * 1. 值不同
+ * 2. 值相同，都是 undefined，并且有依赖，这通常表示一个虚拟值
+ *
+ * @param {*} newValue
+ * @param {*} oldValue
+ * @param {*} deps
+ * @return {boolean}
+ */
+function isChange(newValue, oldValue, deps) {
+  return newValue !== oldValue
+    || newValue === env.UNDEFINED && deps
 }
