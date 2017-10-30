@@ -277,21 +277,24 @@ export default class Observer {
         }
         else {
           let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
-          if (oldIsArray || newIsArray) {
-            let oldLength = oldIsArray ? oldValue.length : env.UNDEFINED, newLength = newIsArray ? newValue.length : env.UNDEFINED
+          let oldLength = oldIsArray || is.string(oldValue) ? oldValue.length: env.UNDEFINED
+          let newLength = newIsArray || is.string(newValue) ? newValue.length : env.UNDEFINED
+          if (is.number(oldLength) || is.number(newLength)) {
             addDifference(
               differences,
               keypathUtil.join(keypath, 'length'),
               newLength,
               oldLength
             )
-            for (let i = 0, length = getMax(newLength, oldLength); i < length; i++) {
-              addDifference(
-                differences,
-                keypathUtil.join(keypath, i),
-                newIsArray ? newValue[ i ] : env.UNDEFINED,
-                oldIsArray ? oldValue[ i ] : env.UNDEFINED
-              )
+            if (oldIsArray || newIsArray) {
+              for (let i = 0, length = getMax(newLength, oldLength); i < length; i++) {
+                addDifference(
+                  differences,
+                  keypathUtil.join(keypath, i),
+                  newIsArray ? newValue[ i ] : env.UNDEFINED,
+                  oldIsArray ? oldValue[ i ] : env.UNDEFINED
+                )
+              }
             }
           }
         }
