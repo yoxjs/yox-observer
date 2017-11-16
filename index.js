@@ -537,14 +537,14 @@ export default class Observer {
         let remove = function (dep, keypath) {
 
           let isFuzzy = isFuzzyKeypath(dep)
-          let deps = isFuzzy ? invertedFuzzyDeps : invertedDeps
+          let tempDeps = isFuzzy ? invertedFuzzyDeps : invertedDeps
 
-          let target = deps[ dep ]
+          let target = tempDeps[ dep ]
           if (target[ keypath ] > 0) {
             target[ keypath ]--
-            if (deps[ keypath ]) {
+            if (tempDeps[ keypath ]) {
               object.each(
-                deps[ keypath ],
+                tempDeps[ keypath ],
                 function (count, key) {
                   remove(dep, key)
                 }
@@ -572,12 +572,12 @@ export default class Observer {
         let add = function (dep, keypath, autoCreate) {
 
           let isFuzzy = isFuzzyKeypath(dep)
-          let deps = isFuzzy ? invertedFuzzyDeps : invertedDeps
+          let tempDeps = isFuzzy ? invertedFuzzyDeps : invertedDeps
 
           // dep 是 keypath 的一个依赖
-          let target = deps[ dep ]
+          let target = tempDeps[ dep ]
           if (!target && autoCreate) {
-            target = deps[ dep ] = { }
+            target = tempDeps[ dep ] = { }
           }
           if (target) {
             if (is.number(target[ keypath ])) {
@@ -587,11 +587,11 @@ export default class Observer {
               target[ keypath ] = 1
             }
             // dep 同样是 keypath 的父级的依赖
-            if (deps[ keypath ]) {
+            if (deps[ dep ]) {
               object.each(
-                deps[ keypath ],
-                function (count, key) {
-                  add(dep, key)
+                deps[ dep ],
+                function (key) {
+                  add(key, keypath)
                 }
               )
             }
