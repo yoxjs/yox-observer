@@ -198,7 +198,7 @@ export default class Observer {
    */
   set(keypath, value) {
 
-    let instance = this, outerDifferences = { }
+    let instance = this, outerDifferences = { }, maxDiffLevel = 4
 
     // 数据监听有两种
     // 1. 类似计算属性的依赖关系，如计算属性 A 的依赖是 B 和 C，当 B 或 C 变了，必须检测 A 是否变了
@@ -216,12 +216,15 @@ export default class Observer {
       object.each(
         inverted,
         function (count, invertedKeypath) {
-          addDifference(differences, invertedKeypath, env.UNDEFINED, instance.get(invertedKeypath), env.TRUE)
+          addDifference(differences, invertedKeypath, env.UNDEFINED, instance.get(invertedKeypath), env.TRUE, 0)
         }
       )
     }
 
-    let addDifference = function (differences, keypath, newValue, oldValue, force) {
+    let addDifference = function (differences, keypath, newValue, oldValue, force, level) {
+      if (level > maxDiffLevel) {
+        return
+      }
       if (force || oldValue !== newValue) {
         // 自己
         differences[ keypath ] = oldValue
@@ -261,19 +264,19 @@ export default class Observer {
           else {
             keys = object.keys(newValue)
           }
-          if (keys) {
-            array.each(
-              keys,
-              function (key) {
-                addDifference(
-                  differences,
-                  keypathUtil.join(keypath, key),
-                  newIsObject ? newValue[ key ] : env.UNDEFINED,
-                  oldIsObject ? oldValue[ key ] : env.UNDEFINED
-                )
-              }
-            )
-          }
+          array.each(
+            keys,
+            function (key) {
+              addDifference(
+                differences,
+                keypathUtil.join(keypath, key),
+                newIsObject ? newValue[ key ] : env.UNDEFINED,
+                oldIsObject ? oldValue[ key ] : env.UNDEFINED,
+                env.FALSE,
+                level + 1
+              )
+            }
+          )
         }
         else {
           let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
@@ -284,7 +287,9 @@ export default class Observer {
               differences,
               keypathUtil.join(keypath, 'length'),
               newLength,
-              oldLength
+              oldLength,
+              env.FALSE,
+              0
             )
             if (oldIsArray || newIsArray) {
               for (let i = 0, length = getMax(newLength, oldLength); i < length; i++) {
@@ -292,7 +297,9 @@ export default class Observer {
                   differences,
                   keypathUtil.join(keypath, i),
                   newIsArray ? newValue[ i ] : env.UNDEFINED,
-                  oldIsArray ? oldValue[ i ] : env.UNDEFINED
+                  oldIsArray ? oldValue[ i ] : env.UNDEFINED,
+                  env.FALSE,
+                  0
                 )
               }
             }
@@ -307,7 +314,7 @@ export default class Observer {
 
       let oldValue = instance.get(keypath), innerDifferences = { }
 
-      addDifference(innerDifferences, keypath, newValue, oldValue)
+      addDifference(innerDifferences, keypath, newValue, oldValue, env.FALSE, 0)
 
       let setter = instance.computedSetters[ keypath ]
       if (setter) {
