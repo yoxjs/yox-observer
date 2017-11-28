@@ -223,6 +223,9 @@ export default class Observer {
 
     let addDifference = function (differences, keypath, newValue, oldValue, force) {
       if (force || oldValue !== newValue) {
+        if (object.has(differences, keypath)) {
+          return
+        }
         // 自己
         differences[ keypath ] = oldValue
 
