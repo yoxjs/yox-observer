@@ -108,7 +108,7 @@ export default class Observer {
         needDeps = cache
       }
 
-      instance.computedGetters[ keypath ] = function () {
+      let getter = function () {
 
         if (cache && object.has(instance.computedCache, keypath)) {
           return instance.computedCache[ keypath ]
@@ -132,12 +132,17 @@ export default class Observer {
 
       }
 
+      getter.$computed = env.TRUE
+      instance.computedGetters[ keypath ] = getter
+
     }
 
     if (set) {
-      instance.computedSetters[ keypath ] = function (value) {
+      let setter = function (value) {
         set.call(instance.context, value)
       }
+      setter.$computed = env.TRUE
+      instance.computedSetters[ keypath ] = setter
     }
 
   }
