@@ -132,7 +132,7 @@ export default class Observer {
 
       }
 
-      getter.$computed = env.TRUE
+      getter.getter = env.TRUE
       instance.computedGetters[ keypath ] = getter
 
     }
@@ -141,7 +141,7 @@ export default class Observer {
       let setter = function (value) {
         set.call(instance.context, value)
       }
-      setter.$computed = env.TRUE
+      setter.setter = env.TRUE
       instance.computedSetters[ keypath ] = setter
     }
 
