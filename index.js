@@ -1,4 +1,6 @@
 
+import * as config from 'yox-config'
+
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as char from 'yox-common/util/char'
@@ -315,7 +317,10 @@ export default class Observer {
 
       let oldValue = instance.get(keypath), innerDifferences = { }
 
-      addDifference(innerDifferences, keypath, newValue, oldValue)
+      // $children 是一个特殊对象，不能参与比较，否则会挂
+      if (keypath !== config.SPECIAL_CHILDREN) {
+        addDifference(innerDifferences, keypath, newValue, oldValue)
+      }
 
       let setter = instance.computedSetters[ keypath ]
       if (setter) {
