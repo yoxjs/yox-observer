@@ -251,6 +251,11 @@ export default class Observer {
           }
         )
 
+        // $children 是一个特殊对象，不能参与递归，否则会挂
+        if (keypath === config.SPECIAL_CHILDREN) {
+          return
+        }
+
         // 子属性
         let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
         if (oldIsObject || newIsObject) {
@@ -317,10 +322,7 @@ export default class Observer {
 
       let oldValue = instance.get(keypath), innerDifferences = { }
 
-      // $children 是一个特殊对象，不能参与比较，否则会挂
-      if (keypath !== config.SPECIAL_CHILDREN) {
-        addDifference(innerDifferences, keypath, newValue, oldValue)
-      }
+      addDifference(innerDifferences, keypath, newValue, oldValue)
 
       let setter = instance.computedSetters[ keypath ]
       if (setter) {
