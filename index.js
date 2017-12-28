@@ -1,6 +1,4 @@
 
-import * as config from 'yox-config'
-
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as char from 'yox-common/util/char'
@@ -251,8 +249,10 @@ export default class Observer {
           }
         )
 
-        // $children 是一个特殊对象，不能参与递归，否则会挂
-        if (keypath === config.SPECIAL_CHILDREN) {
+        // 我们认为 $ 开头的变量是不可递归的
+        // 比如浏览器中常见的 $0 表示当前选中元素
+        // DOM 元素是不能递归的
+        if (string.startsWith(keypath, '$')) {
           return
         }
 
