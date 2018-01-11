@@ -600,15 +600,21 @@ export default class Observer {
             }
             else {
               target[ key ] = 1
+              if (key === keypath) {
+                object.each(
+                  invertedDeps[ key ],
+                  function (value, parentKey) {
+                    add(key, parentKey)
+                  }
+                )
+              }
             }
             // dep 同样是 key 的父级的依赖
-            // 如果 dep 就是当前设置的值，取最新值
-            target = dep === keypath ? value : oldValue
-            if (target) {
+            if (deps[ dep ]) {
               object.each(
-                target,
-                function (dep) {
-                  add(dep, key)
+                deps[ dep ],
+                function (subKey) {
+                  add(subKey, key)
                 }
               )
             }
