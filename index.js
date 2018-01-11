@@ -549,17 +549,17 @@ export default class Observer {
 
       if (removed.length) {
 
-        let remove = function (dep, keypath) {
+        let remove = function (dep, key) {
 
           let isFuzzy = isFuzzyKeypath(dep)
           let tempDeps = isFuzzy ? invertedFuzzyDeps : invertedDeps
 
           let target = tempDeps[ dep ]
-          if (target[ keypath ] > 0) {
-            target[ keypath ]--
-            if (tempDeps[ keypath ]) {
+          if (target[ key ] > 0) {
+            target[ key ]--
+            if (tempDeps[ key ]) {
               object.each(
-                tempDeps[ keypath ],
+                tempDeps[ key ],
                 function (count, key) {
                   remove(dep, key)
                 }
@@ -567,8 +567,8 @@ export default class Observer {
             }
           }
 
-          if (!target[ keypath ]) {
-            delete target[ keypath ]
+          if (!target[ key ]) {
+            delete target[ key ]
           }
 
         }
@@ -584,29 +584,31 @@ export default class Observer {
 
       if (added.length) {
 
-        let add = function (dep, keypath, autoCreate) {
+        let add = function (dep, key, autoCreate) {
 
           let isFuzzy = isFuzzyKeypath(dep)
           let tempDeps = isFuzzy ? invertedFuzzyDeps : invertedDeps
 
-          // dep 是 keypath 的一个依赖
+          // dep 是 key 的一个依赖
           let target = tempDeps[ dep ]
           if (!target && autoCreate) {
             target = tempDeps[ dep ] = { }
           }
           if (target) {
-            if (is.number(target[ keypath ])) {
-              target[ keypath ]++
+            if (is.number(target[ key ])) {
+              target[ key ]++
             }
             else {
-              target[ keypath ] = 1
+              target[ key ] = 1
             }
-            // dep 同样是 keypath 的父级的依赖
-            if (deps[ dep ]) {
+            // dep 同样是 key 的父级的依赖
+            // 如果 dep 就是当前设置的值，取最新值
+            target = dep === keypath ? value : oldValue
+            if (target) {
               object.each(
-                deps[ dep ],
-                function (key) {
-                  add(key, keypath)
+                target,
+                function (dep) {
+                  add(dep, key)
                 }
               )
             }
