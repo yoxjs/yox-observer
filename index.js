@@ -600,11 +600,11 @@ export default class Observer {
             }
             else {
               target[ key ] = 1
-              if (key === keypath) {
+              if (key === keypath && invertedDeps[ key ]) {
                 object.each(
                   invertedDeps[ key ],
                   function (value, parentKey) {
-                    add(key, parentKey)
+                    add(dep, parentKey)
                   }
                 )
               }
