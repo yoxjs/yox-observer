@@ -118,10 +118,12 @@ export default class Observer {
     let changes, watchers
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
       changes = updateValue(changes, newValue, oldValue, keypath)
-      if (!watchers) {
-        watchers = { }
+      if (watcher) {
+        if (!watchers) {
+          watchers = { }
+        }
+        watchers[ watcher.id ] = watcher
       }
-      watchers[ watcher.id ] = watcher
       if (!instance.pending) {
         instance.pending = env.TRUE
         instance.nextTick(
@@ -129,15 +131,18 @@ export default class Observer {
             if (instance.pending) {
               instance.pending = env.FALSE
 
-              object.each(
-                watchers,
-                function (watcher) {
-                  watcher.dirty = env.NULL
-                }
-              )
-              watchers = env.NULL
+              if (watchers) {
+                object.each(
+                  watchers,
+                  function (watcher) {
+                    watcher.dirty = env.NULL
+                  }
+                )
+                watchers = env.NULL
+              }
 
               console.log('fire', changes)
+              let existed = { }
 
               let { emitter } = instance
               let listeners = object.keys(emitter.listeners)
@@ -269,25 +274,17 @@ console.log('get', keypath)
         }
       }
 
-      let match
+      let match, hasFuzzy
       console.log('!!!!', keypath, value, watchers)
       for (let watchKey in watchers) {
         console.log('------', watchKey, keypath)
         if (isFuzzyKeypath(watchKey)) {
-          if (match = matchKeypath(keypath, watchKey)) {
-            array.each(
-              watchers[ watchKey ],
-              function (item) {
-                console.log('update1')
-                item.watcher.update(newValue, oldValue, keypath)
-              }
-            )
-          }
+          hasFuzzy = env.TRUE
         }
         else if (watchKey.indexOf(keypath) === 0) {
           newValue = getValue(watchKey)
           oldValue = instance.get(watchKey)
-          console.log('diff', newValue, oldValue)
+          console.log('diff', watchKey, keypath, newValue, oldValue)
           if (newValue !== oldValue) {
             array.each(
               watchers[ watchKey ],
@@ -300,12 +297,15 @@ console.log('get', keypath)
                     return
                   }
                 }
-                console.log('update2')
                 watcher.update(newValue, oldValue, targetKey)
               }
             )
           }
         }
+      }
+
+      if (hasFuzzy) {
+
       }
 
       let target = instance.computed[ keypath ]
@@ -639,14 +639,22 @@ function createWatch(action) {
       func: watcher,
       watchers: [ ],
       onAdd: function () {
-        eachKeypath(
-          keypath,
-          function (subKeypath) {
-            let watcher = new Watcher(subKeypath, instance.onChange)
-            array.push(data.watchers, watcher)
-            instance.addWatcher(watcher, subKeypath)
-          }
-        )
+        let addWatcher = function (subKeypath, keypath) {
+          let watcher = new Watcher(subKeypath, instance.onChange)
+          array.push(data.watchers, watcher)
+          instance.addWatcher(watcher, subKeypath, keypath)
+        }
+        if (isFuzzyKeypath(keypath)) {
+          addWatcher(keypath)
+        }
+        else {
+          eachKeypath(
+            keypath,
+            function (subKeypath) {
+              addWatcher(subKeypath, keypath)
+            }
+          )
+        }
       },
       onRemove: function () {
         array.each(
