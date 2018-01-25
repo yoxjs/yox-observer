@@ -447,12 +447,12 @@ describe('Observer', () => {
 
       expect(selectedListCount).toBe(1)
       expect(Array.isArray(selectedListNew)).toBe(true)
-      expect(Array.isArray(selectedListOld)).toBe(true)
+      expect(Array.isArray(selectedListOld)).toBe(false)
       expect(selectedListNew).not.toBe(selectedListOld)
 
       expect(sortedSelectedListCount).toBe(1)
       expect(Array.isArray(sortedSelectedListNew)).toBe(true)
-      expect(Array.isArray(sortedSelectedListOld)).toBe(true)
+      expect(Array.isArray(sortedSelectedListOld)).toBe(false)
       expect(sortedSelectedListNew).not.toBe(sortedSelectedListOld)
       done()
     })
