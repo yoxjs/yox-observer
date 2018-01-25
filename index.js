@@ -62,6 +62,7 @@ export class Watcher {
       value = this.value = this.getter()
       Observer.watcher = lastWatcher
       this.dirty = env.NULL
+      console.log('---------------------')
     }
     return value
   }
@@ -119,6 +120,11 @@ export default class Observer {
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
       changes = updateValue(changes, newValue, oldValue, keypath)
       if (watcher) {
+        if (watcher.getter && !changes[ watcher.keypath ]) {
+          changes[ watcher.keypath ] = {
+            oldValue: watcher.value,
+          }
+        }
         if (!watchers) {
           watchers = { }
         }
@@ -135,6 +141,9 @@ export default class Observer {
                 object.each(
                   watchers,
                   function (watcher) {
+                    if (watcher.getter) {
+                      changes[ watcher.keypath ].newValue = watcher.get()
+                    }
                     watcher.dirty = env.NULL
                   }
                 )
@@ -274,12 +283,84 @@ console.log('get', keypath)
         }
       }
 
-      let match, hasFuzzy
+      // 处理通配符比较麻烦
+      // watch('**')
+      // watch('user.*')
+      // watch('user.**')
+      // watch('list.*.name')
+      let match, addDiff
       console.log('!!!!', keypath, value, watchers)
       for (let watchKey in watchers) {
         console.log('------', watchKey, keypath)
         if (isFuzzyKeypath(watchKey)) {
-          hasFuzzy = env.TRUE
+          if (!addDiff) {
+            addDiff = function (newValue, oldValue, key) {
+              if (newValue !== oldValue) {
+                instance.onChange(newValue, oldValue, key)
+                // 我们认为 $ 开头的变量是不可递归的
+                // 比如浏览器中常见的 $0 表示当前选中元素
+                // DOM 元素是不能递归的
+                if (string.startsWith(key, '$')) {
+                  return
+                }
+
+                // 子属性
+                let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
+                if (oldIsObject || newIsObject) {
+                  let keys
+                  if (oldIsObject) {
+                    keys = object.keys(oldValue)
+                    if (newIsObject) {
+                      array.each(
+                        object.keys(newValue),
+                        function (key) {
+                          if (!array.has(keys, key)) {
+                            array.push(keys, key)
+                          }
+                        }
+                      )
+                    }
+                  }
+                  else {
+                    keys = object.keys(newValue)
+                  }
+                  if (keys) {
+                    array.each(
+                      keys,
+                      function (subKey) {
+                        addDiff(
+                          newIsObject ? newValue[ subKey ] : env.UNDEFINED,
+                          oldIsObject ? oldValue[ subKey ] : env.UNDEFINED,
+                          keypathUtil.join(key, subKey)
+                        )
+                      }
+                    )
+                  }
+                }
+                else {
+                  let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
+                  let oldLength = oldIsArray || is.string(oldValue) ? oldValue.length: env.UNDEFINED
+                  let newLength = newIsArray || is.string(newValue) ? newValue.length : env.UNDEFINED
+                  if (is.number(oldLength) || is.number(newLength)) {
+                    addDiff(
+                      newLength,
+                      oldLength,
+                      keypathUtil.join(key, 'length')
+                    )
+                  }
+                  if (oldIsArray || newIsArray) {
+                    for (let i = 0, length = Math.max(toNumber(newLength), toNumber(oldLength)); i < length; i++) {
+                      addDiff(
+                        newIsArray ? newValue[ i ] : env.UNDEFINED,
+                        oldIsArray ? oldValue[ i ] : env.UNDEFINED,
+                        keypathUtil.join(key, i)
+                      )
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
         else if (watchKey.indexOf(keypath) === 0) {
           newValue = getValue(watchKey)
@@ -304,8 +385,8 @@ console.log('get', keypath)
         }
       }
 
-      if (hasFuzzy) {
-
+      if (addDiff) {
+        addDiff(getValue(keypath), instance.get(keypath), keypath)
       }
 
       let target = instance.computed[ keypath ]
