@@ -192,7 +192,9 @@ export default class Observer {
 
     let changes, watchers
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
+
       changes = updateValue(changes, newValue, oldValue, keypath)
+
       // 计算属性，需要记录自己的 oldValue
       // 在 nextTick 时记录 newValue
       if (watcher.getter && !changes[ watcher.keypath ]) {
@@ -362,18 +364,20 @@ export default class Observer {
 
       let updated = { }
       let updateWatchers = function (watchKey, newValue, oldValue, keypath) {
-        let uniqueKey = `${watchKey}:${keypath}`
-        if (watchers[ watchKey ] && !updated[ uniqueKey ]) {
-          updated[ uniqueKey ] = env.TRUE
-          array.each(
-            watchers[ watchKey ],
-            function (watcher) {
-              watcher.update(newValue, oldValue, keypath)
-              if (keypath !== watcher.keypath) {
-                updateWatchers(watcher.keypath, newValue, oldValue, keypath)
+        if (watchers[ watchKey ]) {
+          let uniqueKey = `${watchKey}:${keypath}`
+          if (!updated[ uniqueKey ]) {
+            updated[ uniqueKey ] = env.TRUE
+            array.each(
+              watchers[ watchKey ],
+              function (watcher) {
+                watcher.update(newValue, oldValue, keypath)
+                if (keypath !== watcher.keypath) {
+                  updateWatchers(watcher.keypath, newValue, oldValue, keypath)
+                }
               }
-            }
-          )
+            )
+          }
         }
       }
 
@@ -597,7 +601,8 @@ export default class Observer {
       let watcher = new Watcher(keypath, instance.onChange)
 
       if (get) {
-        if (is.array(deps)) {
+        let hasDeps = is.array(deps) && deps.length > 0
+        if (hasDeps) {
           array.each(
             deps,
             function (dep) {
@@ -606,7 +611,12 @@ export default class Observer {
           )
         }
         watcher.getter = function () {
-          instance.removeWatcher(watcher)
+          if (hasDeps) {
+            Observer.watcher = env.NULL
+          }
+          else {
+            instance.removeWatcher(watcher)
+          }
           return execute(get, instance.context)
         }
       }
