@@ -67,7 +67,6 @@ export class Watcher {
   }
 
   update(newValue, oldValue, keypath) {
-    console.log('update', newValue, oldValue, keypath, this.keypath)
     this.dirty = updateValue(this.dirty, newValue, oldValue, keypath)
     let { callback } = this
     if (callback) {
@@ -148,7 +147,6 @@ export default class Observer {
                 watchers = env.NULL
               }
 
-              console.log('fire', changes)
               let existed = { }
 
               let { emitter } = instance
@@ -208,7 +206,7 @@ export default class Observer {
     }
 
     keypath = keypathUtil.normalize(keypath)
-console.log('get', keypath)
+
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
     let watcher = Observer.watcher
@@ -279,15 +277,22 @@ console.log('get', keypath)
         }
       }
 
-      let updateWatchers = function (watchers, newValue, oldValue, keypath) {
-        array.each(
-          watchers,
-          function (watcher) {
-            watcher.update(newValue, oldValue, keypath)
-          }
-        )
+      let updated = { }
+      let updateWatchers = function (watchKey, newValue, oldValue, keypath) {
+        let uniqueKey = `${watchKey}:${keypath}`
+        if (watchers[ watchKey ] && !updated[ uniqueKey ]) {
+          updated[ uniqueKey ] = env.TRUE
+          array.each(
+            watchers[ watchKey ],
+            function (watcher) {
+              watcher.update(newValue, oldValue, keypath)
+              if (keypath !== watcher.keypath) {
+                updateWatchers(watcher.keypath, newValue, oldValue, keypath)
+              }
+            }
+          )
+        }
       }
-console.log('set', keypath, value, watchers)
 
       let match, fuzzyKeypaths = [ ]
       object.each(
@@ -295,7 +300,7 @@ console.log('set', keypath, value, watchers)
         function (list, watchKey) {
           if (isFuzzyKeypath(watchKey)) {
             if (matchKeypath(keypath, watchKey)) {
-              updateWatchers(list, newValue, oldValue, keypath)
+              updateWatchers(watchKey, newValue, oldValue, keypath)
             }
             else {
               array.push(fuzzyKeypaths, watchKey)
@@ -304,7 +309,7 @@ console.log('set', keypath, value, watchers)
           else if (watchKey.indexOf(keypath) === 0) {
             let watchNewValue = getNewValue(watchKey), watchOldValue = instance.get(watchKey)
             if (watchNewValue !== watchOldValue) {
-              updateWatchers(list, watchNewValue, watchOldValue, watchKey)
+              updateWatchers(watchKey, watchNewValue, watchOldValue, watchKey)
             }
           }
         }
@@ -323,7 +328,7 @@ console.log('set', keypath, value, watchers)
               function (fuzzyKeypath) {
                 if (matchKeypath(key, fuzzyKeypath)) {
                   updateWatchers(
-                    watchers[ fuzzyKeypath ],
+                    fuzzyKeypath,
                     newValue,
                     oldValue,
                     key
