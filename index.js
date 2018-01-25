@@ -62,12 +62,12 @@ export class Watcher {
       value = this.value = this.getter()
       Observer.watcher = lastWatcher
       this.dirty = env.NULL
-      console.log('---------------------')
     }
     return value
   }
 
   update(newValue, oldValue, keypath) {
+    console.log('update', newValue, oldValue, keypath, this.keypath)
     this.dirty = updateValue(this.dirty, newValue, oldValue, keypath)
     let { callback } = this
     if (callback) {
@@ -119,17 +119,15 @@ export default class Observer {
     let changes, watchers
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
       changes = updateValue(changes, newValue, oldValue, keypath)
-      if (watcher) {
-        if (watcher.getter && !changes[ watcher.keypath ]) {
-          changes[ watcher.keypath ] = {
-            oldValue: watcher.value,
-          }
+      if (watcher.getter && !changes[ watcher.keypath ]) {
+        changes[ watcher.keypath ] = {
+          oldValue: watcher.value,
         }
-        if (!watchers) {
-          watchers = { }
-        }
-        watchers[ watcher.id ] = watcher
       }
+      if (!watchers) {
+        watchers = { }
+      }
+      watchers[ watcher.id ] = watcher
       if (!instance.pending) {
         instance.pending = env.TRUE
         instance.nextTick(
@@ -161,7 +159,6 @@ export default class Observer {
                   if (item.newValue !== item.oldValue) {
                     let args = [ item.newValue, item.oldValue, keypath ]
                     emitter.fire(keypath, args)
-                    console.log('file', keypath, args)
                     array.each(
                       listeners,
                       function (key) {
@@ -170,7 +167,6 @@ export default class Observer {
                           let newArgs = object.copy(args)
                           array.push(newArgs, match)
                           emitter.fire(key, newArgs)
-                          console.log('file', key, newArgs)
                         }
                       }
                     )
@@ -220,7 +216,7 @@ console.log('get', keypath)
       eachKeypath(
         keypath,
         function (subKeypath) {
-          instance.addWatcher(watcher, subKeypath, keypath)
+          instance.addWatcher(watcher, subKeypath)
         }
       )
     }
@@ -270,7 +266,7 @@ console.log('get', keypath)
 
       let { watchers, context } = instance
 
-      let getValue = function (key) {
+      let getNewValue = function (key) {
         key = string.slice(key, keypathUtil.startsWith(key, keypath))
         if (key) {
           key = object.get(value, key)
@@ -283,110 +279,131 @@ console.log('get', keypath)
         }
       }
 
-      // 处理通配符比较麻烦
-      // watch('**')
-      // watch('user.*')
-      // watch('user.**')
-      // watch('list.*.name')
-      let match, addDiff
-      console.log('!!!!', keypath, value, watchers)
-      for (let watchKey in watchers) {
-        console.log('------', watchKey, keypath)
-        if (isFuzzyKeypath(watchKey)) {
-          if (!addDiff) {
-            addDiff = function (newValue, oldValue, key) {
-              if (newValue !== oldValue) {
-                instance.onChange(newValue, oldValue, key)
-                // 我们认为 $ 开头的变量是不可递归的
-                // 比如浏览器中常见的 $0 表示当前选中元素
-                // DOM 元素是不能递归的
-                if (string.startsWith(key, '$')) {
-                  return
-                }
+      let updateWatchers = function (watchers, newValue, oldValue, keypath) {
+        array.each(
+          watchers,
+          function (watcher) {
+            watcher.update(newValue, oldValue, keypath)
+          }
+        )
+      }
+console.log('set', keypath, value, watchers)
 
-                // 子属性
-                let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
-                if (oldIsObject || newIsObject) {
-                  let keys
-                  if (oldIsObject) {
-                    keys = object.keys(oldValue)
-                    if (newIsObject) {
-                      array.each(
-                        object.keys(newValue),
-                        function (key) {
-                          if (!array.has(keys, key)) {
-                            array.push(keys, key)
-                          }
-                        }
-                      )
-                    }
-                  }
-                  else {
-                    keys = object.keys(newValue)
-                  }
-                  if (keys) {
-                    array.each(
-                      keys,
-                      function (subKey) {
-                        addDiff(
-                          newIsObject ? newValue[ subKey ] : env.UNDEFINED,
-                          oldIsObject ? oldValue[ subKey ] : env.UNDEFINED,
-                          keypathUtil.join(key, subKey)
-                        )
-                      }
-                    )
-                  }
+      let match, fuzzyKeypaths = [ ]
+      object.each(
+        watchers,
+        function (list, watchKey) {
+          if (isFuzzyKeypath(watchKey)) {
+            if (matchKeypath(keypath, watchKey)) {
+              updateWatchers(list, newValue, oldValue, keypath)
+            }
+            else {
+              array.push(fuzzyKeypaths, watchKey)
+            }
+          }
+          else if (watchKey.indexOf(keypath) === 0) {
+            let watchNewValue = getNewValue(watchKey), watchOldValue = instance.get(watchKey)
+            if (watchNewValue !== watchOldValue) {
+              updateWatchers(list, watchNewValue, watchOldValue, watchKey)
+            }
+          }
+        }
+      )
+
+      // 存在模糊匹配的需求
+      // 必须对数据进行递归
+      // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
+      if (fuzzyKeypaths.length) {
+
+        let addChange = function (newValue, oldValue, key) {
+          if (newValue !== oldValue) {
+
+            array.each(
+              fuzzyKeypaths,
+              function (fuzzyKeypath) {
+                if (matchKeypath(key, fuzzyKeypath)) {
+                  updateWatchers(
+                    watchers[ fuzzyKeypath ],
+                    newValue,
+                    oldValue,
+                    key
+                  )
                 }
-                else {
-                  let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
-                  let oldLength = oldIsArray || is.string(oldValue) ? oldValue.length: env.UNDEFINED
-                  let newLength = newIsArray || is.string(newValue) ? newValue.length : env.UNDEFINED
-                  if (is.number(oldLength) || is.number(newLength)) {
-                    addDiff(
-                      newLength,
-                      oldLength,
-                      keypathUtil.join(key, 'length')
+              }
+            )
+
+            // 我们认为 $ 开头的变量是不可递归的
+            // 比如浏览器中常见的 $0 表示当前选中元素
+            // DOM 元素是不能递归的
+            if (string.startsWith(key, '$')) {
+              return
+            }
+
+            // 子属性
+            let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
+            if (oldIsObject || newIsObject) {
+              let keys
+              if (oldIsObject) {
+                keys = object.keys(oldValue)
+                if (newIsObject) {
+                  array.each(
+                    object.keys(newValue),
+                    function (key) {
+                      if (!array.has(keys, key)) {
+                        array.push(keys, key)
+                      }
+                    }
+                  )
+                }
+              }
+              else {
+                keys = object.keys(newValue)
+              }
+              if (keys) {
+                array.each(
+                  keys,
+                  function (subKey) {
+                    addChange(
+                      newIsObject ? newValue[ subKey ] : env.UNDEFINED,
+                      oldIsObject ? oldValue[ subKey ] : env.UNDEFINED,
+                      keypathUtil.join(key, subKey)
                     )
                   }
-                  if (oldIsArray || newIsArray) {
-                    for (let i = 0, length = Math.max(toNumber(newLength), toNumber(oldLength)); i < length; i++) {
-                      addDiff(
-                        newIsArray ? newValue[ i ] : env.UNDEFINED,
-                        oldIsArray ? oldValue[ i ] : env.UNDEFINED,
-                        keypathUtil.join(key, i)
-                      )
-                    }
-                  }
+                )
+              }
+            }
+            else {
+              let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
+              let oldLength = oldIsArray || is.string(oldValue) ? oldValue.length: env.UNDEFINED
+              let newLength = newIsArray || is.string(newValue) ? newValue.length : env.UNDEFINED
+              if (is.number(oldLength) || is.number(newLength)) {
+                addChange(
+                  newLength,
+                  oldLength,
+                  keypathUtil.join(key, 'length')
+                )
+              }
+              if (oldIsArray || newIsArray) {
+                newLength = toNumber(newLength)
+                oldLength = toNumber(oldLength)
+                for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
+                  addChange(
+                    newIsArray ? newValue[ i ] : env.UNDEFINED,
+                    oldIsArray ? oldValue[ i ] : env.UNDEFINED,
+                    keypathUtil.join(key, i)
+                  )
                 }
               }
             }
           }
         }
-        else if (watchKey.indexOf(keypath) === 0) {
-          newValue = getValue(watchKey)
-          oldValue = instance.get(watchKey)
-          console.log('diff', watchKey, keypath, newValue, oldValue)
-          if (newValue !== oldValue) {
-            array.each(
-              watchers[ watchKey ],
-              function (item) {
-                let { targetKey, watcher } = item
-                if (targetKey !== watchKey) {
-                  newValue = getValue(targetKey)
-                  oldValue = instance.get(targetKey)
-                  if (newValue === oldValue) {
-                    return
-                  }
-                }
-                watcher.update(newValue, oldValue, targetKey)
-              }
-            )
-          }
-        }
-      }
 
-      if (addDiff) {
-        addDiff(getValue(keypath), instance.get(keypath), keypath)
+        addChange(
+          value,
+          instance.get(keypath),
+          keypath
+        )
+
       }
 
       let target = instance.computed[ keypath ]
@@ -424,15 +441,10 @@ console.log('get', keypath)
    *
    * @param {Watcher} watcher
    * @param {string} watchKey
-   * @param {?string} targetKey
    */
-  addWatcher(watcher, watchKey, targetKey) {
-    console.log('add', watchKey, targetKey)
+  addWatcher(watcher, watchKey) {
     let watchers = this.watchers[ watchKey ] || (this.watchers[ watchKey ] = [ ])
-    watchers.push({
-      watcher,
-      targetKey: targetKey || watchKey,
-    })
+    watchers.push(watcher)
   }
 
   /**
@@ -442,7 +454,6 @@ console.log('get', keypath)
    * @param {?string} watchKey
    */
   removeWatcher(watcher, watchKey) {
-    console.log('remove ' + watchKey)
     let { watchers } = this
     if (watchers) {
       let remove = function (list, watchKey) {
@@ -518,7 +529,9 @@ console.log('get', keypath)
         }
       }
 
-      this.computed[ keypath ] = watcher
+      instance.addWatcher(watcher, keypath)
+
+      instance.computed[ keypath ] = watcher
 
     }
 
@@ -720,10 +733,10 @@ function createWatch(action) {
       func: watcher,
       watchers: [ ],
       onAdd: function () {
-        let addWatcher = function (subKeypath, keypath) {
-          let watcher = new Watcher(subKeypath, instance.onChange)
+        let addWatcher = function (keypath) {
+          let watcher = new Watcher(keypath, instance.onChange)
           array.push(data.watchers, watcher)
-          instance.addWatcher(watcher, subKeypath, keypath)
+          instance.addWatcher(watcher, keypath)
         }
         if (isFuzzyKeypath(keypath)) {
           addWatcher(keypath)
@@ -731,8 +744,8 @@ function createWatch(action) {
         else {
           eachKeypath(
             keypath,
-            function (subKeypath) {
-              addWatcher(subKeypath, keypath)
+            function (keypath) {
+              addWatcher(keypath)
             }
           )
         }
