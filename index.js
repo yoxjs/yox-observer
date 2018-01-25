@@ -13,7 +13,14 @@ import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
-
+/**
+ * 记录对比值
+ *
+ * @param {?Object} changes
+ * @param {*} newValue
+ * @param {*} oldValue
+ * @param {string} keypath
+ */
 function updateValue(changes, newValue, oldValue, keypath) {
   if (!changes) {
     changes = { }
@@ -30,6 +37,12 @@ function updateValue(changes, newValue, oldValue, keypath) {
   return changes
 }
 
+/**
+ * 遍历 keypath 的每一段
+ *
+ * @param {string} keypath
+ * @param {Function} callback
+ */
 function eachKeypath(keypath, callback) {
   for (let i = 0, len = keypath.length; i < len;) {
     i = keypath.indexOf('.', i)
@@ -44,7 +57,69 @@ function eachKeypath(keypath, callback) {
   }
 }
 
+let patternCache = { }
+
+/**
+ * 模糊匹配 Keypath
+ *
+ * @param {string} keypath
+ * @param {string} pattern
+ * @return {?Array.<string>}
+ */
+function matchKeypath(keypath, pattern) {
+  let cache = patternCache[ pattern ]
+  if (!cache) {
+    cache = pattern
+      .replace(/\./g, '\\.')
+      .replace(/\*\*/g, '([\.\\w]+?)')
+      .replace(/\*/g, '(\\w+)')
+    cache = patternCache[ pattern ] = new RegExp(`^${cache}$`)
+  }
+  let match = keypath.match(cache)
+  if (match) {
+    return array.toArray(match).slice(1)
+  }
+}
+
+/**
+ * 是否模糊匹配
+ *
+ * @param {string} keypath
+ * @return {boolean}
+ */
+function isFuzzyKeypath(keypath) {
+  return string.has(keypath, '*')
+}
+
+/**
+ * 从 getter 对象的所有 key 中，选择和 keypath 最匹配的那一个
+ *
+ * @param {Object} obj
+ * @param {string} keypath
+ * @return {Object}
+ */
+function matchBest(obj, keypath) {
+
+  let result = { }
+
+  array.each(
+    object.sort(obj, env.TRUE),
+    function (prefix) {
+      let length = keypathUtil.startsWith(keypath, prefix)
+      if (length !== env.FALSE) {
+        result.target = obj[ prefix ]
+        result.prop = string.slice(keypath, length)
+        return env.FALSE
+      }
+    }
+  )
+
+  return result
+
+}
+
 let guid = 0
+
 export class Watcher {
 
   constructor(keypath, callback) {
@@ -54,20 +129,20 @@ export class Watcher {
   }
 
   get() {
-    let { value, dirty } = this
+    let { value } = this
     // 减少取值频率，尤其是处理复杂的计算规则
     if (this.isDirty()) {
       let lastWatcher = Observer.watcher
       Observer.watcher = this
       value = this.value = this.getter()
       Observer.watcher = lastWatcher
-      this.dirty = env.NULL
+      this.changes = env.NULL
     }
     return value
   }
 
   update(newValue, oldValue, keypath) {
-    this.dirty = updateValue(this.dirty, newValue, oldValue, keypath)
+    this.changes = updateValue(this.changes, newValue, oldValue, keypath)
     let { callback } = this
     if (callback) {
       callback(newValue, oldValue, keypath, this)
@@ -75,11 +150,11 @@ export class Watcher {
   }
 
   isDirty() {
-    let { dirty } = this, result
-    if (isDef(dirty)) {
-      if (dirty) {
+    let { changes } = this, result
+    if (isDef(changes)) {
+      if (changes) {
         object.each(
-          dirty,
+          changes,
           function (item, keypath) {
             if (item.newValue !== item.oldValue) {
               result = env.TRUE
@@ -118,15 +193,20 @@ export default class Observer {
     let changes, watchers
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
       changes = updateValue(changes, newValue, oldValue, keypath)
+      // 计算属性，需要记录自己的 oldValue
+      // 在 nextTick 时记录 newValue
       if (watcher.getter && !changes[ watcher.keypath ]) {
         changes[ watcher.keypath ] = {
           oldValue: watcher.value,
         }
       }
+      // 记录触发过变化的 watcher
+      // 方便 nextTick 取新值、清 changes
       if (!watchers) {
         watchers = { }
       }
       watchers[ watcher.id ] = watcher
+
       if (!instance.pending) {
         instance.pending = env.TRUE
         instance.nextTick(
@@ -134,20 +214,19 @@ export default class Observer {
             if (instance.pending) {
               instance.pending = env.FALSE
 
-              if (watchers) {
-                object.each(
-                  watchers,
-                  function (watcher) {
-                    if (watcher.getter) {
-                      changes[ watcher.keypath ].newValue = watcher.get()
-                    }
-                    watcher.dirty = env.NULL
+              object.each(
+                watchers,
+                function (watcher) {
+                  if (watcher.getter) {
+                    changes[ watcher.keypath ].newValue = watcher.get()
                   }
-                )
-                watchers = env.NULL
-              }
-
-              let existed = { }
+                  if (watcher.changes) {
+                    watcher.changes = env.NULL
+                  }
+                }
+              )
+              // 方便下次重新开始
+              watchers = env.NULL
 
               let { emitter } = instance
               let listeners = object.keys(emitter.listeners)
@@ -198,6 +277,10 @@ export default class Observer {
    */
   get(keypath, defaultValue) {
 
+    if (!is.string(keypath) || isFuzzyKeypath(keypath)) {
+      return
+    }
+
     let instance = this, result
 
     // 传入 '' 获取整个 data
@@ -224,14 +307,14 @@ export default class Observer {
       target = target.get()
       if (prop) {
         if (object.exists(target, prop)) {
-          result = { value: target[ prop ] }
+          return target[ prop ]
         }
         else if (!is.primitive(target)) {
           result = object.get(target, prop)
         }
       }
       else {
-        result = { value: target }
+        return target
       }
     }
 
@@ -465,7 +548,7 @@ export default class Observer {
         array.each(
           list,
           function (item, index) {
-            if (item.watcher === watcher) {
+            if (item === watcher) {
               list.splice(index, 1)
             }
           },
@@ -766,7 +849,8 @@ function createWatch(action) {
     }
 
     emitter[ action ](keypath, data)
-    if (sync && !isFuzzyKeypath(keypath)) {
+
+    if (sync) {
       execute(
         watcher,
         context,
@@ -806,63 +890,4 @@ function createWatch(action) {
 
 }
 
-let patternCache = { }
 
-/**
- * 模糊匹配 Keypath
- *
- * @param {string} keypath
- * @param {string} pattern
- * @return {?Array.<string>}
- */
-function matchKeypath(keypath, pattern) {
-  let cache = patternCache[ pattern ]
-  if (!cache) {
-    cache = pattern
-      .replace(/\./g, '\\.')
-      .replace(/\*\*/g, '([\.\\w]+?)')
-      .replace(/\*/g, '(\\w+)')
-    cache = patternCache[ pattern ] = new RegExp(`^${cache}$`)
-  }
-  let match = keypath.match(cache)
-  if (match) {
-    return array.toArray(match).slice(1)
-  }
-}
-
-/**
- * 是否模糊匹配
- *
- * @param {string} keypath
- * @return {boolean}
- */
-function isFuzzyKeypath(keypath) {
-  return string.has(keypath, '*')
-}
-
-/**
- * 从 getter 对象的所有 key 中，选择和 keypath 最匹配的那一个
- *
- * @param {Object} obj
- * @param {string} keypath
- * @return {Object}
- */
-function matchBest(obj, keypath) {
-
-  let result = { }
-
-  array.each(
-    object.sort(obj, env.TRUE),
-    function (prefix) {
-      let length = keypathUtil.startsWith(keypath, prefix)
-      if (length !== env.FALSE) {
-        result.target = obj[ prefix ]
-        result.prop = string.slice(keypath, length)
-        return env.FALSE
-      }
-    }
-  )
-
-  return result
-
-}
