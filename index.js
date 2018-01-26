@@ -1,7 +1,6 @@
 
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
-import * as char from 'yox-common/util/char'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
@@ -44,15 +43,15 @@ function updateValue(changes, newValue, oldValue, keypath) {
  * @param {Function} callback
  */
 function eachKeypath(keypath, callback) {
-  for (let i = 0, len = keypath.length; i < len;) {
-    i = keypath.indexOf('.', i)
-    if (i > 0) {
-      callback(keypath.substr(0, i))
-      i++
-    }
-    else {
-      callback(keypath)
-      break
+  if (callback(keypath) !== env.FALSE) {
+    for (let i = keypath.length - 1; i >= 0;) {
+      i = keypath.lastIndexOf('.', i)
+      if (i > 0) {
+        if (callback(keypath.substr(0, i)) === env.FALSE) {
+          return
+        }
+        i--
+      }
     }
   }
 }
@@ -175,7 +174,7 @@ export class Watcher {
 
 }
 
-export default class Observer {
+export class Observer {
 
   /**
    * @param {Object} options
@@ -230,6 +229,7 @@ export default class Observer {
                   }
                 }
               )
+
               // 方便下次重新开始
               watchers = env.NULL
 
@@ -278,9 +278,10 @@ export default class Observer {
    *
    * @param {string} keypath
    * @param {?*} defaultValue
+   * @param {?boolean} lookup
    * @return {?*}
    */
-  get(keypath, defaultValue) {
+  get(keypath, defaultValue, lookup) {
 
     if (!is.string(keypath) || isFuzzyKeypath(keypath)) {
       return
@@ -289,7 +290,7 @@ export default class Observer {
     let instance = this, result
 
     // 传入 '' 获取整个 data
-    if (keypath === char.CHAR_BLANK) {
+    if (keypath === '') {
       return instance.data
     }
 
@@ -324,7 +325,21 @@ export default class Observer {
     }
 
     if (!result) {
-      result = object.get(instance.data, keypath)
+      let { data } = instance
+      if (lookup) {
+        eachKeypath(
+          keypath,
+          function (subKeypath) {
+            result = object.get(data, subKeypath)
+            if (result) {
+              return env.FALSE
+            }
+          }
+        )
+      }
+      else {
+        result = object.get(data, keypath)
+      }
     }
 
     return result ? result.value : defaultValue

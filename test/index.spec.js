@@ -1,5 +1,7 @@
 
-import Observer from '../index'
+import {
+  Observer
+} from '../index'
 import * as array from 'yox-common/util/array'
 
 describe('Observer', () => {
