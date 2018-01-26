@@ -129,9 +129,12 @@ export class Watcher {
   }
 
   get() {
-    let { value } = this
+    let { value, cache } = this
+    if (cache === env.FALSE) {
+      value = this.value = this.getter()
+    }
     // 减少取值频率，尤其是处理复杂的计算规则
-    if (this.isDirty()) {
+    else  if (this.isDirty()) {
       let lastWatcher = Observer.watcher
       Observer.watcher = this
       value = this.value = this.getter()
@@ -499,8 +502,8 @@ export default class Observer {
       }
 
       let target = instance.computed[ keypath ]
-      if (target && target.setter) {
-        target.setter(value)
+      if (target && target.set) {
+        target.set(value)
       }
       else {
         let { target, prop } = matchBest(instance.computed, keypath)
@@ -579,12 +582,15 @@ export default class Observer {
    */
   addComputed(keypath, computed) {
 
-    let instance = this, get, set, deps
+    let instance = this, cache = env.TRUE, get, set, deps
 
     if (is.func(computed)) {
       get = computed
     }
     else if (is.object(computed)) {
+      if (is.boolean(computed.cache)) {
+        cache = computed.cache
+      }
       if (is.func(computed.get)) {
         get = computed.get
       }
@@ -610,6 +616,7 @@ export default class Observer {
             }
           )
         }
+        watcher.cache = cache
         watcher.getter = function () {
           if (hasDeps) {
             Observer.watcher = env.NULL
@@ -622,7 +629,7 @@ export default class Observer {
       }
 
       if (set) {
-        watcher.setter = function (value) {
+        watcher.set = function (value) {
           set.call(instance.context, value)
         }
       }
@@ -899,5 +906,3 @@ function createWatch(action) {
   }
 
 }
-
-
