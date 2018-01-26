@@ -618,11 +618,13 @@ export default class Observer {
         }
         watcher.cache = cache
         watcher.getter = function () {
-          if (hasDeps) {
-            Observer.watcher = env.NULL
-          }
-          else {
-            instance.removeWatcher(watcher)
+          if (cache) {
+            if (hasDeps) {
+              Observer.watcher = env.NULL
+            }
+            else {
+              instance.removeWatcher(watcher)
+            }
           }
           return execute(get, instance.context)
         }
