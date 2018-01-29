@@ -278,10 +278,9 @@ export class Observer {
    *
    * @param {string} keypath
    * @param {?*} defaultValue
-   * @param {?boolean} lookup
    * @return {?*}
    */
-  get(keypath, defaultValue, lookup) {
+  get(keypath, defaultValue) {
 
     if (!is.string(keypath) || isFuzzyKeypath(keypath)) {
       return
@@ -325,21 +324,7 @@ export class Observer {
     }
 
     if (!result) {
-      let { data } = instance
-      if (lookup) {
-        eachKeypath(
-          keypath,
-          function (subKeypath) {
-            result = object.get(data, subKeypath)
-            if (result) {
-              return env.FALSE
-            }
-          }
-        )
-      }
-      else {
-        result = object.get(data, keypath)
-      }
+      result = object.get(instance.data, keypath)
     }
 
     return result ? result.value : defaultValue
