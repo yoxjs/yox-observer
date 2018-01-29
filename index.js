@@ -45,7 +45,7 @@ function updateValue(changes, newValue, oldValue, keypath) {
 function eachKeypath(keypath, callback) {
   if (callback(keypath) !== env.FALSE) {
     for (let i = keypath.length - 1; i >= 0;) {
-      i = keypath.lastIndexOf('.', i)
+      i = keypath.lastIndexOf(env.KEYPATH_SEPARATOR, i)
       if (i > 0) {
         if (callback(keypath.substr(0, i)) === env.FALSE) {
           return
