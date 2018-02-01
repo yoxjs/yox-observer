@@ -93,20 +93,20 @@ function isFuzzyKeypath(keypath) {
 /**
  * 从 getter 对象的所有 key 中，选择和 keypath 最匹配的那一个
  *
- * @param {Object} obj
+ * @param {Array.<string>} sorted
  * @param {string} keypath
  * @return {Object}
  */
-function matchBest(obj, keypath) {
+function matchBest(sorted, keypath) {
 
   let result = { }
 
   array.each(
-    object.sort(obj, env.TRUE),
+    sorted,
     function (prefix) {
       let length = keypathUtil.startsWith(keypath, prefix)
       if (length !== env.FALSE) {
-        result.target = obj[ prefix ]
+        result.name = prefix
         result.prop = string.slice(keypath, length)
         return env.FALSE
       }
@@ -308,19 +308,21 @@ export class Observer {
       )
     }
 
-    let { target, prop } = matchBest(instance.computed, keypath)
-    if (target) {
-      target = target.get()
-      if (prop) {
-        if (object.exists(target, prop)) {
-          return target[ prop ]
+    if (instance.reversedComputedKeys) {
+      let { name, prop } = matchBest(instance.reversedComputedKeys, keypath)
+      if (name) {
+        let target = instance.computed[ name ].get()
+        if (prop) {
+          if (object.exists(target, prop)) {
+            return target[ prop ]
+          }
+          else if (!is.primitive(target)) {
+            result = object.get(target, prop)
+          }
         }
-        else if (!is.primitive(target)) {
-          result = object.get(target, prop)
+        else {
+          return target
         }
-      }
-      else {
-        return target
       }
     }
 
@@ -507,19 +509,17 @@ export class Observer {
         target.set(value)
       }
       else {
-        let { target, prop } = matchBest(instance.computed, keypath)
-        if (target && prop) {
-          target = target.get()
-          if (is.primitive(target)) {
+        if (instance.reversedComputedKeys) {
+          let { name, prop } = matchBest(instance.reversedComputedKeys, keypath)
+          if (name && prop) {
+            target = instance.computed[ name ].get()
+            if (!is.primitive(target)) {
+              object.set(target, prop, value)
+            }
             return
           }
-          else {
-            object.set(target, prop, value)
-          }
         }
-        else {
-          object.set(instance.data, keypath, value)
-        }
+        object.set(instance.data, keypath, value)
       }
     }
 
@@ -639,7 +639,11 @@ export class Observer {
 
       instance.addWatcher(watcher, keypath)
 
-      return instance.computed[ keypath ] = watcher
+      instance.computed[ keypath ] = watcher
+
+      instance.reversedComputedKeys = object.sort(instance.computed, env.TRUE)
+
+      return watcher
 
     }
 
