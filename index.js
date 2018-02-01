@@ -218,25 +218,27 @@ export class Observer {
             if (instance.pending) {
               instance.pending = env.FALSE
 
+              let currentWatchers = object.copy(watchers)
+              let currentChanges = object.copy(changes)
+
+              watchers = changes = env.NULL
+
               object.each(
-                watchers,
+                currentWatchers,
                 function (watcher) {
                   if (watcher.getter) {
-                    changes[ watcher.keypath ].newValue = watcher.get()
+                    currentChanges[ watcher.keypath ].newValue = watcher.get()
                   }
-                  if (watcher.changes) {
+                  else if (watcher.changes) {
                     watcher.changes = env.NULL
                   }
                 }
               )
 
-              // 方便下次重新开始
-              watchers = env.NULL
-
               let { emitter } = instance
               let listeners = object.keys(emitter.listeners)
               object.each(
-                changes,
+                currentChanges,
                 function (item, keypath) {
                   if (item.newValue !== item.oldValue) {
                     let args = [ item.newValue, item.oldValue, keypath ]
@@ -255,7 +257,6 @@ export class Observer {
                   }
                 }
               )
-              changes = env.NULL
             }
           }
         )
