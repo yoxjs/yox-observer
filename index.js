@@ -127,13 +127,13 @@ export class Watcher {
     this.callback = callback
   }
 
-  get() {
+  get(force) {
     let { value, cache } = this
     if (cache === env.FALSE) {
       value = this.value = this.getter()
     }
     // 减少取值频率，尤其是处理复杂的计算规则
-    else  if (this.isDirty()) {
+    else  if (force || this.isDirty()) {
       let lastWatcher = Observer.watcher
       Observer.watcher = this
       value = this.value = this.getter()
@@ -639,7 +639,7 @@ export class Observer {
 
       instance.addWatcher(watcher, keypath)
 
-      instance.computed[ keypath ] = watcher
+      return instance.computed[ keypath ] = watcher
 
     }
 
@@ -773,6 +773,10 @@ export class Observer {
 
   nextTick(fn) {
     nextTask.append(fn)
+  }
+
+  nextRun() {
+    nextTask.run()
   }
 
   /**
