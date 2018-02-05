@@ -37,26 +37,6 @@ function updateValue(changes, newValue, oldValue, keypath) {
 }
 
 /**
- * 遍历 keypath 的每一段
- *
- * @param {string} keypath
- * @param {Function} callback
- */
-function eachKeypath(keypath, callback) {
-  if (callback(keypath) !== env.FALSE) {
-    for (let i = keypath.length - 1; i >= 0;) {
-      i = string.lastIndexOf(keypath, env.KEYPATH_SEPARATOR, i)
-      if (i > 0) {
-        if (callback(string.slice(keypath, 0, i)) === env.FALSE) {
-          return
-        }
-        i--
-      }
-    }
-  }
-}
-
-/**
  * 对比新旧对象
  *
  * @param {?Object} newObject
@@ -191,7 +171,9 @@ function matchBest(sorted, keypath) {
 
 let guid = 0
 
-export class Watcher {
+let currentComputed
+
+export class Computed {
 
   constructor(keypath, observer) {
 
@@ -202,12 +184,29 @@ export class Watcher {
     instance.observer = observer
     instance.deps = [ ]
 
-    instance.update = function (newValue, oldValue, keypath) {
-      instance.changes = updateValue(instance.changes, newValue, oldValue, keypath)
-      if (keypath === instance.keypath) {
-        instance.observer.onChange(newValue, oldValue, keypath, instance)
+  }
+
+  update(newValue, oldValue, key) {
+
+    let instance = this
+    let { observer, keypath, value } = instance
+
+    instance.changes = updateValue(instance.changes, newValue, oldValue, key)
+
+    observer.onChange(newValue, oldValue, key, instance, value)
+
+    // 当前计算属性是否是其他计算属性的依赖
+    object.each(
+      observer.computed,
+      function (computed, key) {
+        if (computed.hasDep(keypath)) {
+          observer.emitter.fire(
+            keypath,
+            [ instance.get(), value, keypath ]
+          )
+        }
       }
-    }
+    )
 
   }
 
@@ -218,19 +217,23 @@ export class Watcher {
     }
     // 减少取值频率，尤其是处理复杂的计算规则
     else  if (force || this.isDirty()) {
-      let lastWatcher = Observer.watcher
-      Observer.watcher = this
+      let lastComputed = currentComputed
+      currentComputed = this
       value = this.value = this.getter()
-      Observer.watcher = lastWatcher
+      currentComputed = lastComputed
       this.changes = env.NULL
     }
     return value
   }
 
+  hasDep(dep) {
+    return array.has(this.deps, dep)
+  }
+
   addDep(dep) {
-    if (!array.has(this.deps, dep)) {
+    if (!this.hasDep(dep)) {
       array.push(this.deps, dep)
-      this.observer.watch(dep, this.update)
+      this.observer.watch(dep, this.update, env.FALSE, this)
     }
   }
 
@@ -289,6 +292,7 @@ export class Observer {
     instance.data = options.data || { }
     instance.context = options.context || instance
     instance.emitter = new Emitter()
+    instance.asyncEmitter = new Emitter()
 
     if (options.computed) {
       object.each(
@@ -301,69 +305,60 @@ export class Observer {
 
   }
 
-  onChange(newValue, oldValue, keypath, watcher) {
+  onChange(newValue, oldValue, keypath, computed, computedValue) {
 
     let instance = this
 
-    let fireChange = function () {
+    instance.changes = updateValue(instance.changes, newValue, oldValue, keypath)
 
-      let currentChanges = instance.changes
+    if (computed && !instance.changes[ computed.keypath ]) {
+      instance.changes[ computed.keypath ] = {
+        computed,
+        oldValue: computedValue,
+      }
+    }
 
-      instance.changes = env.NULL
+    if (!instance.pending) {
+      instance.pending = env.TRUE
+      instance.nextTick(
+        function () {
+          if (instance.pending) {
 
-      let { emitter } = instance
-      let listenerKeys = object.keys(emitter.listeners)
+            instance.pending = env.FALSE
 
-      object.each(
-        currentChanges,
-        function (item, keypath) {
-          let { oldValue, watcher } = item
-          let newValue = watcher.get()
-          if (newValue !== oldValue) {
-            let args = [ newValue, oldValue, keypath ]
-            emitter.fire(keypath, args)
-            array.each(
-              listenerKeys,
-              function (key) {
-                if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
-                  emitter.fire(key, args)
+            let currentChanges = instance.changes
+
+            instance.changes = env.NULL
+
+            let { asyncEmitter } = instance
+            let listenerKeys = object.keys(asyncEmitter.listeners)
+
+            object.each(
+              currentChanges,
+              function (item, keypath) {
+                let { newValue, oldValue, computed } = item
+                if (computed) {
+                  newValue = computed.get()
+                }
+                if (newValue !== oldValue) {
+                  let args = [ newValue, oldValue, keypath ]
+                  asyncEmitter.fire(keypath, args)
+                  array.each(
+                    listenerKeys,
+                    function (key) {
+                      if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
+                        asyncEmitter.fire(key, args)
+                      }
+                    }
+                  )
                 }
               }
             )
+
           }
         }
       )
-
     }
-
-    // 计算属性
-    // 当计算属性以 $ 开头时，表示需要异步触发 change，如模板更新
-    let watchKey = watcher.keypath
-    let changes = instance.changes || (instance.changes = { })
-
-    if (!changes[ watchKey ]) {
-      changes[ watchKey ] = {
-        watcher,
-        oldValue: watcher.value,
-      }
-    }
-
-    if (string.startsWith(watchKey, '$')) {
-      if (!instance.pending) {
-        instance.pending = env.TRUE
-        instance.nextTick(
-          function () {
-            if (instance.pending) {
-              instance.pending = env.FALSE
-              fireChange()
-            }
-          }
-        )
-      }
-      return
-    }
-
-    fireChange()
 
   }
 
@@ -391,14 +386,8 @@ export class Observer {
 
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
-    let watcher = Observer.watcher
-    if (watcher) {
-      eachKeypath(
-        keypath,
-        function (subKeypath) {
-          watcher.addDep(subKeypath)
-        }
-      )
+    if (currentComputed) {
+      currentComputed.addDep(keypath)
     }
 
     let { computed, reversedComputedKeys } = instance
@@ -436,6 +425,10 @@ export class Observer {
 
     let instance = this
 
+    let { emitter } = instance
+
+    let listenKeys = object.keys(emitter.listeners)
+
     let setValue = function (value, keypath) {
 
       keypath = keypathUtil.normalize(keypath)
@@ -445,8 +438,6 @@ export class Observer {
       if (newValue === oldValue) {
         return
       }
-
-      let { emitter } = instance
 
       let getNewValue = function (key) {
         if (key === keypath || value == env.NULL) {
@@ -466,21 +457,21 @@ export class Observer {
 
       let fuzzyKeypaths = [ ]
 
-      object.each(
-        emitter.listeners,
-        function (_, watchKey) {
-          if (isFuzzyKeypath(watchKey)) {
-            if (matchKeypath(keypath, watchKey)) {
-              emitter.fire(watchKey, [ newValue, oldValue, keypath ])
+      array.each(
+        listenKeys,
+        function (listenKey) {
+          if (isFuzzyKeypath(listenKey)) {
+            if (matchKeypath(keypath, listenKey)) {
+              emitter.fire(listenKey, [ newValue, oldValue, keypath ])
             }
             else {
-              array.push(fuzzyKeypaths, watchKey)
+              array.push(fuzzyKeypaths, listenKey)
             }
           }
-          else if (string.startsWith(watchKey, keypath)) {
-            let watchNewValue = getNewValue(watchKey), watchOldValue = instance.get(watchKey)
-            if (watchNewValue !== watchOldValue) {
-              emitter.fire(watchKey, [ watchNewValue, watchOldValue, watchKey ])
+          else if (string.startsWith(listenKey, keypath)) {
+            let listenNewValue = getNewValue(listenKey), listenOldValue = instance.get(listenKey)
+            if (listenNewValue !== listenOldValue) {
+              emitter.fire(listenKey, [ listenNewValue, listenOldValue, listenKey ])
             }
           }
         }
@@ -620,7 +611,7 @@ export class Observer {
 
     if (get || set) {
 
-      let watcher = new Watcher(keypath, instance)
+      let computed = new Computed(keypath, instance)
 
       if (get) {
         let hasDeps = is.array(deps) && deps.length > 0
@@ -628,18 +619,18 @@ export class Observer {
           array.each(
             deps,
             function (dep) {
-              watcher.addDep(dep)
+              computed.addDep(dep)
             }
           )
         }
-        watcher.cache = cache
-        watcher.getter = function () {
+        computed.cache = cache
+        computed.getter = function () {
           if (cache) {
             if (hasDeps) {
-              Observer.watcher = env.NULL
+              currentComputed = env.NULL
             }
             else {
-              watcher.clearDep()
+              computed.clearDep()
             }
           }
           return execute(get, instance.context)
@@ -647,17 +638,20 @@ export class Observer {
       }
 
       if (set) {
-        watcher.set = function (value) {
+        computed.set = function (value) {
           set.call(instance.context, value)
         }
       }
 
-      let computed = instance.computed || (instance.computed = { })
-      computed[ keypath ] = watcher
+      if (!instance.computed) {
+        instance.computed = { }
+      }
 
-      instance.reversedComputedKeys = object.sort(computed, env.TRUE)
+      instance.computed[ keypath ] = computed
 
-      return watcher
+      instance.reversedComputedKeys = object.sort(instance.computed, env.TRUE)
+
+      return computed
 
     }
 
@@ -836,15 +830,17 @@ object.extend(
      * @param {Function} watcher
      */
     unwatch: function (keypath, watcher) {
-      let { emitter } = this
+      let { emitter, asyncEmitter } = this
       if (is.string(keypath)) {
         emitter.off(keypath, watcher)
+        asyncEmitter.off(keypath, watcher)
       }
       else if (is.object(keypath)) {
         object.each(
           keypath,
           function (watcher, keypath) {
             emitter.off(keypath, watcher)
+            asyncEmitter.off(keypath, watcher)
           }
         )
       }
@@ -855,34 +851,48 @@ object.extend(
 
 function createWatch(action) {
 
-  let watch = function (instance, keypath, func, sync) {
+  let watch = function (instance, keypath, func, sync, computed) {
 
     let { context } = instance
 
     instance.emitter[ action ](
       keypath,
       {
-        func,
-        context,
+        func: computed ? func : instance.onChange,
+        context: computed ? computed : instance,
       }
     )
+
+    if (!computed) {
+      instance.asyncEmitter[ action ](
+        keypath,
+        {
+          func,
+          context,
+        }
+      )
+    }
 
     if (sync) {
       execute(
         func,
         context,
-        [ instance.get(keypath), env.UNDEFINED, keypath ]
+        [
+          instance.get(keypath),
+          env.UNDEFINED,
+          keypath
+        ]
       )
     }
 
   }
 
-  return function (keypath, watcher, sync) {
+  return function (keypath, watcher, sync, computed) {
 
     let instance = this
 
     if (is.string(keypath)) {
-      watch(instance, keypath, watcher, sync)
+      watch(instance, keypath, watcher, sync, computed)
     }
     else {
       if (watcher === env.TRUE) {
@@ -891,14 +901,14 @@ function createWatch(action) {
       object.each(
         keypath,
         function (value, keypath) {
-          let watcher = value, innerSync = sync
+          let watcher = value, itemSync = sync
           if (is.object(value)) {
             watcher = value.watcher
             if (is.boolean(value.sync)) {
-              innerSync = value.sync
+              itemSync = value.sync
             }
           }
-          watch(instance, keypath, watcher, innerSync)
+          watch(instance, keypath, watcher, itemSync, computed)
         }
       )
     }
