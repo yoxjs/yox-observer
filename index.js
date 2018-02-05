@@ -193,10 +193,22 @@ let guid = 0
 
 export class Watcher {
 
-  constructor(keypath, callback) {
-    this.id = ++guid
-    this.keypath = keypath
-    this.callback = callback
+  constructor(keypath, observer) {
+
+    let instance = this
+
+    instance.id = ++guid
+    instance.keypath = keypath
+    instance.observer = observer
+    instance.deps = [ ]
+
+    instance.update = function (newValue, oldValue, keypath) {
+      instance.changes = updateValue(instance.changes, newValue, oldValue, keypath)
+      if (keypath === instance.keypath) {
+        instance.observer.onChange(newValue, oldValue, keypath, instance)
+      }
+    }
+
   }
 
   get(force) {
@@ -215,12 +227,27 @@ export class Watcher {
     return value
   }
 
-  update(newValue, oldValue, keypath) {
-    this.changes = updateValue(this.changes, newValue, oldValue, keypath)
-    let { callback } = this
-    if (callback) {
-      callback(newValue, oldValue, keypath, this)
+  addDep(dep) {
+    if (!array.has(this.deps, dep)) {
+      array.push(this.deps, dep)
+      this.observer.watch(dep, this.update)
     }
+  }
+
+  removeDep(dep) {
+    array.remove(this.deps, dep)
+    this.observer.unwatch(dep, this.update)
+  }
+
+  clearDep() {
+    let instance = this
+    array.each(
+      instance.deps,
+      function (dep) {
+        instance.removeDep(dep)
+      },
+      env.TRUE
+    )
   }
 
   isDirty() {
@@ -262,79 +289,6 @@ export class Observer {
     instance.data = options.data || { }
     instance.context = options.context || instance
     instance.emitter = new Emitter()
-    instance.watchers = { }
-    instance.watchKeys = { }
-
-    let changes, watchers
-    instance.onChange = function (newValue, oldValue, keypath, watcher) {
-
-      changes = updateValue(changes, newValue, oldValue, keypath)
-
-      // 计算属性，需要记录自己的 oldValue
-      // 在 nextTick 时记录 newValue
-      if (watcher.getter && !changes[ watcher.keypath ]) {
-        changes[ watcher.keypath ] = {
-          oldValue: watcher.value,
-        }
-      }
-      // 记录触发过变化的 watcher
-      // 方便 nextTick 取新值、清 changes
-      if (!watchers) {
-        watchers = { }
-      }
-      watchers[ watcher.id ] = watcher
-
-      if (!instance.pending) {
-        instance.pending = env.TRUE
-        instance.nextTick(
-          function () {
-            if (instance.pending) {
-              instance.pending = env.FALSE
-
-              let currentWatchers = object.copy(watchers)
-              let currentChanges = object.copy(changes)
-
-              watchers = changes = env.NULL
-
-              object.each(
-                currentWatchers,
-                function (watcher) {
-                  if (watcher.getter) {
-                    currentChanges[ watcher.keypath ].newValue = watcher.get()
-                  }
-                  else if (watcher.changes) {
-                    watcher.changes = env.NULL
-                  }
-                }
-              )
-
-              let { emitter } = instance
-              let listeners = object.keys(emitter.listeners)
-              object.each(
-                currentChanges,
-                function (item, keypath) {
-                  if (item.newValue !== item.oldValue) {
-                    let args = [ item.newValue, item.oldValue, keypath ]
-                    emitter.fire(keypath, args)
-                    array.each(
-                      listeners,
-                      function (key) {
-                        let match
-                        if (isFuzzyKeypath(key) && (match = matchKeypath(keypath, key))) {
-                          let newArgs = object.copy(args)
-                          array.push(newArgs, match)
-                          emitter.fire(key, newArgs)
-                        }
-                      }
-                    )
-                  }
-                }
-              )
-            }
-          }
-        )
-      }
-    }
 
     if (options.computed) {
       object.each(
@@ -344,6 +298,72 @@ export class Observer {
         }
       )
     }
+
+  }
+
+  onChange(newValue, oldValue, keypath, watcher) {
+
+    let instance = this
+
+    let fireChange = function () {
+
+      let currentChanges = instance.changes
+
+      instance.changes = env.NULL
+
+      let { emitter } = instance
+      let listenerKeys = object.keys(emitter.listeners)
+
+      object.each(
+        currentChanges,
+        function (item, keypath) {
+          let { oldValue, watcher } = item
+          let newValue = watcher.get()
+          if (newValue !== oldValue) {
+            let args = [ newValue, oldValue, keypath ]
+            emitter.fire(keypath, args)
+            array.each(
+              listenerKeys,
+              function (key) {
+                if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
+                  emitter.fire(key, args)
+                }
+              }
+            )
+          }
+        }
+      )
+
+    }
+
+    // 计算属性
+    // 当计算属性以 $ 开头时，表示需要异步触发 change，如模板更新
+    let watchKey = watcher.keypath
+    let changes = instance.changes || (instance.changes = { })
+
+    if (!changes[ watchKey ]) {
+      changes[ watchKey ] = {
+        watcher,
+        oldValue: watcher.value,
+      }
+    }
+
+    if (string.startsWith(watchKey, '$')) {
+      if (!instance.pending) {
+        instance.pending = env.TRUE
+        instance.nextTick(
+          function () {
+            if (instance.pending) {
+              instance.pending = env.FALSE
+              fireChange()
+            }
+          }
+        )
+      }
+      return
+    }
+
+    fireChange()
 
   }
 
@@ -376,7 +396,7 @@ export class Observer {
       eachKeypath(
         keypath,
         function (subKeypath) {
-          instance.addWatcher(watcher, subKeypath, keypath)
+          watcher.addDep(subKeypath)
         }
       )
     }
@@ -426,7 +446,7 @@ export class Observer {
         return
       }
 
-      let { watchers, context } = instance
+      let { emitter } = instance
 
       let getNewValue = function (key) {
         if (key === keypath || value == env.NULL) {
@@ -444,32 +464,14 @@ export class Observer {
         }
       }
 
-      let updated = { }
-      let updateWatchers = function (watchKey, newValue, oldValue, keypath) {
-        if (watchers[ watchKey ]) {
-          let uniqueKey = `${watchKey}:${keypath}`
-          if (!updated[ uniqueKey ]) {
-            updated[ uniqueKey ] = env.TRUE
-            array.each(
-              watchers[ watchKey ],
-              function (watcher) {
-                watcher.update(newValue, oldValue, keypath)
-                if (keypath !== watcher.keypath) {
-                  updateWatchers(watcher.keypath, newValue, oldValue, keypath)
-                }
-              }
-            )
-          }
-        }
-      }
+      let fuzzyKeypaths = [ ]
 
-      let match, fuzzyKeypaths = [ ]
       object.each(
-        watchers,
+        emitter.listeners,
         function (_, watchKey) {
           if (isFuzzyKeypath(watchKey)) {
             if (matchKeypath(keypath, watchKey)) {
-              updateWatchers(watchKey, newValue, oldValue, keypath)
+              emitter.fire(watchKey, [ newValue, oldValue, keypath ])
             }
             else {
               array.push(fuzzyKeypaths, watchKey)
@@ -478,7 +480,7 @@ export class Observer {
           else if (string.startsWith(watchKey, keypath)) {
             let watchNewValue = getNewValue(watchKey), watchOldValue = instance.get(watchKey)
             if (watchNewValue !== watchOldValue) {
-              updateWatchers(watchKey, watchNewValue, watchOldValue, watchKey)
+              emitter.fire(watchKey, [ watchNewValue, watchOldValue, watchKey ])
             }
           }
         }
@@ -496,7 +498,7 @@ export class Observer {
               fuzzyKeypaths,
               function (fuzzyKeypath) {
                 if (matchKeypath(key, fuzzyKeypath)) {
-                  updateWatchers(fuzzyKeypath, newValue, oldValue, key)
+                  emitter.fire(fuzzyKeypath, [ newValue, oldValue, key ])
                 }
               }
             )
@@ -511,10 +513,11 @@ export class Observer {
 
             let newIs = is.string(newValue), oldIs = is.string(oldValue)
             if (newIs || oldIs) {
+              let length = 'length'
               addChange(
-                newIs ? newValue.length : env.UNDEFINED,
-                oldIs ? oldValue.length : env.UNDEFINED,
-                keypathUtil.join(key, 'length')
+                newIs ? newValue[ length ] : env.UNDEFINED,
+                oldIs ? oldValue[ length ] : env.UNDEFINED,
+                keypathUtil.join(key, length)
               )
             }
             else {
@@ -588,56 +591,6 @@ export class Observer {
   }
 
   /**
-   * 添加数据监听
-   *
-   * @param {Watcher} watcher
-   * @param {string} watchKey
-   */
-  addWatcher(watcher, watchKey) {
-    let uniqueKey = watcher.id + '-' + watchKey
-    if (!this.watchKeys[ uniqueKey ]) {
-      this.watchKeys[ uniqueKey ] = env.TRUE
-      array.push(
-        this.watchers[ watchKey ] || (this.watchers[ watchKey ] = [ ]),
-        watcher
-      )
-    }
-  }
-
-  /**
-   * 移除数据监听
-   *
-   * @param {Watcher} watcher
-   * @param {?string} watchKey
-   */
-  removeWatcher(watcher, watchKey) {
-    let { watchers, watchKeys } = this
-    if (watchers) {
-      let remove = function (list, watchKey) {
-        array.each(
-          list,
-          function (item, index) {
-            if (item === watcher) {
-              list.splice(index, 1)
-              delete watchKeys[ watcher.id + '-' + watchKey ]
-            }
-          },
-          env.TRUE
-        )
-      }
-      if (watchKey) {
-        let list = watchers[ watchKey ]
-        if (list) {
-          remove(list, watchKey)
-        }
-      }
-      else {
-        object.each(watchers, remove)
-      }
-    }
-  }
-
-  /**
    * 添加计算属性
    *
    * @param {string} keypath
@@ -667,7 +620,7 @@ export class Observer {
 
     if (get || set) {
 
-      let watcher = new Watcher(keypath, instance.onChange)
+      let watcher = new Watcher(keypath, instance)
 
       if (get) {
         let hasDeps = is.array(deps) && deps.length > 0
@@ -675,7 +628,7 @@ export class Observer {
           array.each(
             deps,
             function (dep) {
-              instance.addWatcher(watcher, dep)
+              watcher.addDep(dep)
             }
           )
         }
@@ -686,7 +639,7 @@ export class Observer {
               Observer.watcher = env.NULL
             }
             else {
-              instance.removeWatcher(watcher)
+              watcher.clearDep()
             }
           }
           return execute(get, instance.context)
@@ -698,8 +651,6 @@ export class Observer {
           set.call(instance.context, value)
         }
       }
-
-      instance.addWatcher(watcher, keypath)
 
       let computed = instance.computed || (instance.computed = { })
       computed[ keypath ] = watcher
@@ -906,40 +857,13 @@ function createWatch(action) {
 
   let watch = function (instance, keypath, func, sync) {
 
-    let { emitter, context } = instance, watchers = [ ]
+    let { context } = instance
 
-    emitter[ action ](
+    instance.emitter[ action ](
       keypath,
       {
         func,
         context,
-        watchers,
-        onAdd: function () {
-          let addWatcher = function (watchKey) {
-            let watcher = new Watcher(watchKey, instance.onChange)
-            array.push(watchers, watcher)
-            instance.addWatcher(watcher, watchKey)
-          }
-          if (isFuzzyKeypath(keypath)) {
-            addWatcher(keypath)
-          }
-          else {
-            eachKeypath(
-              keypath,
-              function (subKeypath) {
-                addWatcher(subKeypath)
-              }
-            )
-          }
-        },
-        onRemove: function () {
-          array.each(
-            watchers,
-            function (watcher) {
-              instance.removeWatcher(watcher, watcher.keypath)
-            }
-          )
-        }
       }
     )
 
