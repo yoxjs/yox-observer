@@ -796,6 +796,7 @@ export class Observer {
    */
   destroy() {
     this.emitter.off()
+    this.asyncEmitter.off()
     object.clear(this)
   }
 
