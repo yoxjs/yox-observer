@@ -56,6 +56,78 @@ function eachKeypath(keypath, callback) {
   }
 }
 
+/**
+ * 对比新旧对象
+ *
+ * @param {?Object} newObject
+ * @param {?Object} oldObject
+ * @param {Function} callback
+ */
+function diffObject(newObject, oldObject, callback) {
+
+  let keys
+  if (oldObject) {
+    keys = object.keys(oldObject)
+    if (newObject) {
+      array.each(
+        object.keys(newObject),
+        function (key) {
+          if (!array.has(keys, key)) {
+            array.push(keys, key)
+          }
+        }
+      )
+    }
+  }
+  else if (newObject) {
+    keys = object.keys(newObject)
+  }
+  if (keys) {
+    array.each(
+      keys,
+      function (key) {
+        callback(
+          newObject ? newObject[ key ] : env.UNDEFINED,
+          oldObject ? oldObject[ key ] : env.UNDEFINED,
+          key
+        )
+      }
+    )
+  }
+}
+
+/**
+ * 对比新旧数组
+ *
+ * @param {?Array} newArray
+ * @param {?Array} oldArray
+ * @param {Function} callback
+ */
+function diffArray(newArray, oldArray, callback) {
+
+  if (newArray || oldArray) {
+
+    let newLength = newArray ? newArray.length : 0
+    let oldLength = oldArray ? oldArray.length : 0
+
+    callback(
+      newArray ? newLength : env.UNDEFINED,
+      oldArray ? oldLength : env.UNDEFINED,
+      'length'
+    )
+
+    for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
+      callback(
+        newArray ? newArray[ i ] : env.UNDEFINED,
+        oldArray ? oldArray[ i ] : env.UNDEFINED,
+        i
+      )
+    }
+
+  }
+
+}
+
 let patternCache = { }
 
 /**
@@ -186,11 +258,12 @@ export class Observer {
 
     let instance = this
 
+    instance.id = ++guid
     instance.data = options.data || { }
     instance.context = options.context || instance
     instance.emitter = new Emitter()
-    instance.computed = { }
     instance.watchers = { }
+    instance.watchKeys = { }
 
     let changes, watchers
     instance.onChange = function (newValue, oldValue, keypath, watcher) {
@@ -303,32 +376,31 @@ export class Observer {
       eachKeypath(
         keypath,
         function (subKeypath) {
-          instance.addWatcher(watcher, subKeypath)
+          instance.addWatcher(watcher, subKeypath, keypath)
         }
       )
     }
 
-    if (instance.reversedComputedKeys) {
-      let { name, prop } = matchBest(instance.reversedComputedKeys, keypath)
-      if (name) {
-        let target = instance.computed[ name ].get()
-        if (prop) {
-          if (object.exists(target, prop)) {
-            return target[ prop ]
-          }
-          else if (!is.primitive(target)) {
-            result = object.get(target, prop)
-          }
+    let { computed, reversedComputedKeys } = instance
+    if (computed) {
+      let target = computed[ keypath ]
+      if (target) {
+        return target.get()
+      }
+      let { name, prop } = matchBest(reversedComputedKeys, keypath)
+      if (name && prop) {
+        target = instance.computed[ name ].get()
+        if (object.exists(target, prop)) {
+          return target[ prop ]
         }
-        else {
-          return target
+        else if (target != env.NULL) {
+          result = object.get(target, prop)
+          return result ? result.value : env.UNDEFINED
         }
       }
     }
 
-    if (!result) {
-      result = object.get(instance.data, keypath)
-    }
+    result = object.get(instance.data, keypath)
 
     return result ? result.value : defaultValue
 
@@ -349,6 +421,7 @@ export class Observer {
       keypath = keypathUtil.normalize(keypath)
 
       let newValue = value, oldValue = instance.get(keypath)
+
       if (newValue === oldValue) {
         return
       }
@@ -356,15 +429,18 @@ export class Observer {
       let { watchers, context } = instance
 
       let getNewValue = function (key) {
-        key = string.slice(key, keypathUtil.startsWith(key, keypath))
-        if (key) {
-          key = object.get(value, key)
-          if (key) {
-            return key.value
-          }
-        }
-        else {
+        if (key === keypath || value == env.NULL) {
           return value
+        }
+        key = object.get(
+          value,
+          string.slice(
+            key,
+            keypathUtil.startsWith(key, keypath)
+          )
+        )
+        if (key) {
+          return key.value
         }
       }
 
@@ -390,7 +466,7 @@ export class Observer {
       let match, fuzzyKeypaths = [ ]
       object.each(
         watchers,
-        function (list, watchKey) {
+        function (_, watchKey) {
           if (isFuzzyKeypath(watchKey)) {
             if (matchKeypath(keypath, watchKey)) {
               updateWatchers(watchKey, newValue, oldValue, keypath)
@@ -399,7 +475,7 @@ export class Observer {
               array.push(fuzzyKeypaths, watchKey)
             }
           }
-          else if (watchKey.indexOf(keypath) === 0) {
+          else if (string.startsWith(watchKey, keypath)) {
             let watchNewValue = getNewValue(watchKey), watchOldValue = instance.get(watchKey)
             if (watchNewValue !== watchOldValue) {
               updateWatchers(watchKey, watchNewValue, watchOldValue, watchKey)
@@ -420,12 +496,7 @@ export class Observer {
               fuzzyKeypaths,
               function (fuzzyKeypath) {
                 if (matchKeypath(key, fuzzyKeypath)) {
-                  updateWatchers(
-                    fuzzyKeypath,
-                    newValue,
-                    oldValue,
-                    key
-                  )
+                  updateWatchers(fuzzyKeypath, newValue, oldValue, key)
                 }
               }
             )
@@ -437,62 +508,45 @@ export class Observer {
               return
             }
 
-            // 子属性
-            let oldIsObject = is.object(oldValue), newIsObject = is.object(newValue)
-            if (oldIsObject || newIsObject) {
-              let keys
-              if (oldIsObject) {
-                keys = object.keys(oldValue)
-                if (newIsObject) {
-                  array.each(
-                    object.keys(newValue),
-                    function (key) {
-                      if (!array.has(keys, key)) {
-                        array.push(keys, key)
-                      }
-                    }
-                  )
-                }
+
+            let newIs = is.string(newValue), oldIs = is.string(oldValue)
+            if (newIs || oldIs) {
+              addChange(
+                newIs ? newValue.length : env.UNDEFINED,
+                oldIs ? oldValue.length : env.UNDEFINED,
+                keypathUtil.join(key, 'length')
+              )
+            }
+            else {
+              newIs = is.object(newValue), oldIs = is.object(oldValue)
+              if (newIs || oldIs) {
+                diffObject(
+                  newIs && newValue,
+                  oldIs && oldValue,
+                  function (newValue, oldValue, prop) {
+                    addChange(
+                      newValue,
+                      oldValue,
+                      keypathUtil.join(key, prop)
+                    )
+                  }
+                )
               }
               else {
-                keys = object.keys(newValue)
-              }
-              if (keys) {
-                array.each(
-                  keys,
-                  function (subKey) {
+                diffArray(
+                  is.array(newValue) && newValue,
+                  is.array(oldValue) && oldValue,
+                  function (newValue, oldValue, index) {
                     addChange(
-                      newIsObject ? newValue[ subKey ] : env.UNDEFINED,
-                      oldIsObject ? oldValue[ subKey ] : env.UNDEFINED,
-                      keypathUtil.join(key, subKey)
+                      newValue,
+                      oldValue,
+                      keypathUtil.join(key, index)
                     )
                   }
                 )
               }
             }
-            else {
-              let oldIsArray = is.array(oldValue), newIsArray = is.array(newValue)
-              let oldLength = oldIsArray || is.string(oldValue) ? oldValue.length: env.UNDEFINED
-              let newLength = newIsArray || is.string(newValue) ? newValue.length : env.UNDEFINED
-              if (is.number(oldLength) || is.number(newLength)) {
-                addChange(
-                  newLength,
-                  oldLength,
-                  keypathUtil.join(key, 'length')
-                )
-              }
-              if (oldIsArray || newIsArray) {
-                newLength = toNumber(newLength)
-                oldLength = toNumber(oldLength)
-                for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
-                  addChange(
-                    newIsArray ? newValue[ i ] : env.UNDEFINED,
-                    oldIsArray ? oldValue[ i ] : env.UNDEFINED,
-                    keypathUtil.join(key, i)
-                  )
-                }
-              }
-            }
+
           }
         }
 
@@ -504,23 +558,24 @@ export class Observer {
 
       }
 
-      let target = instance.computed[ keypath ]
-      if (target && target.set) {
-        target.set(value)
-      }
-      else {
-        if (instance.reversedComputedKeys) {
-          let { name, prop } = matchBest(instance.reversedComputedKeys, keypath)
-          if (name && prop) {
-            target = instance.computed[ name ].get()
-            if (!is.primitive(target)) {
-              object.set(target, prop, value)
-            }
-            return
-          }
+      let { computed, reversedComputedKeys } = instance
+      if (computed) {
+        let target = computed[ keypath ]
+        if (target && target.set) {
+          target.set(value)
+          return
         }
-        object.set(instance.data, keypath, value)
+        let { name, prop } = matchBest(reversedComputedKeys, keypath)
+        if (name && prop) {
+          target = computed[ name ].get()
+          if (!is.primitive(target)) {
+            object.set(target, prop, value)
+          }
+          return
+        }
       }
+      object.set(instance.data, keypath, value)
+
     }
 
     if (is.string(keypath)) {
@@ -539,8 +594,14 @@ export class Observer {
    * @param {string} watchKey
    */
   addWatcher(watcher, watchKey) {
-    let watchers = this.watchers[ watchKey ] || (this.watchers[ watchKey ] = [ ])
-    watchers.push(watcher)
+    let uniqueKey = watcher.id + '-' + watchKey
+    if (!this.watchKeys[ uniqueKey ]) {
+      this.watchKeys[ uniqueKey ] = env.TRUE
+      array.push(
+        this.watchers[ watchKey ] || (this.watchers[ watchKey ] = [ ]),
+        watcher
+      )
+    }
   }
 
   /**
@@ -550,7 +611,7 @@ export class Observer {
    * @param {?string} watchKey
    */
   removeWatcher(watcher, watchKey) {
-    let { watchers } = this
+    let { watchers, watchKeys } = this
     if (watchers) {
       let remove = function (list, watchKey) {
         array.each(
@@ -558,6 +619,7 @@ export class Observer {
           function (item, index) {
             if (item === watcher) {
               list.splice(index, 1)
+              delete watchKeys[ watcher.id + '-' + watchKey ]
             }
           },
           env.TRUE
@@ -639,9 +701,10 @@ export class Observer {
 
       instance.addWatcher(watcher, keypath)
 
-      instance.computed[ keypath ] = watcher
+      let computed = instance.computed || (instance.computed = { })
+      computed[ keypath ] = watcher
 
-      instance.reversedComputedKeys = object.sort(instance.computed, env.TRUE)
+      instance.reversedComputedKeys = object.sort(computed, env.TRUE)
 
       return watcher
 
@@ -787,6 +850,7 @@ export class Observer {
    * 销毁
    */
   destroy() {
+    this.emitter.off()
     object.clear(this)
   }
 
@@ -840,47 +904,48 @@ object.extend(
 
 function createWatch(action) {
 
-  let watch = function (instance, keypath, watcher, sync) {
+  let watch = function (instance, keypath, func, sync) {
 
-    let { emitter, context } = instance
+    let { emitter, context } = instance, watchers = [ ]
 
-    let data = {
-      context,
-      func: watcher,
-      watchers: [ ],
-      onAdd: function () {
-        let addWatcher = function (keypath) {
-          let watcher = new Watcher(keypath, instance.onChange)
-          array.push(data.watchers, watcher)
-          instance.addWatcher(watcher, keypath)
-        }
-        if (isFuzzyKeypath(keypath)) {
-          addWatcher(keypath)
-        }
-        else {
-          eachKeypath(
-            keypath,
-            function (keypath) {
-              addWatcher(keypath)
+    emitter[ action ](
+      keypath,
+      {
+        func,
+        context,
+        watchers,
+        onAdd: function () {
+          let addWatcher = function (watchKey) {
+            let watcher = new Watcher(watchKey, instance.onChange)
+            array.push(watchers, watcher)
+            instance.addWatcher(watcher, watchKey)
+          }
+          if (isFuzzyKeypath(keypath)) {
+            addWatcher(keypath)
+          }
+          else {
+            eachKeypath(
+              keypath,
+              function (subKeypath) {
+                addWatcher(subKeypath)
+              }
+            )
+          }
+        },
+        onRemove: function () {
+          array.each(
+            watchers,
+            function (watcher) {
+              instance.removeWatcher(watcher, watcher.keypath)
             }
           )
         }
-      },
-      onRemove: function () {
-        array.each(
-          data.watchers,
-          function (watcher) {
-            instance.removeWatcher(watcher, watcher.keypath)
-          }
-        )
       }
-    }
-
-    emitter[ action ](keypath, data)
+    )
 
     if (sync) {
       execute(
-        watcher,
+        func,
         context,
         [ instance.get(keypath), env.UNDEFINED, keypath ]
       )
