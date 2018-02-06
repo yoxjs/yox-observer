@@ -12,6 +12,12 @@ import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
+const LENGTH = 'length'
+
+let guid = 0
+
+let CURRENT_COMPUTED
+
 /**
  * 记录对比值
  *
@@ -47,16 +53,13 @@ function diffObject(newObject, oldObject, callback) {
 
   let keys
   if (oldObject) {
-    keys = object.keys(oldObject)
     if (newObject) {
-      array.each(
-        object.keys(newObject),
-        function (key) {
-          if (!array.has(keys, key)) {
-            array.push(keys, key)
-          }
-        }
+      keys = object.keys(
+        object.extend({ }, oldObject, newObject)
       )
+    }
+    else {
+      keys = object.keys(oldObject)
     }
   }
   else if (newObject) {
@@ -87,13 +90,13 @@ function diffArray(newArray, oldArray, callback) {
 
   if (newArray || oldArray) {
 
-    let newLength = newArray ? newArray.length : 0
-    let oldLength = oldArray ? oldArray.length : 0
+    let newLength = newArray ? newArray[ LENGTH ] : 0
+    let oldLength = oldArray ? oldArray[ LENGTH ] : 0
 
     callback(
       newArray ? newLength : env.UNDEFINED,
       oldArray ? oldLength : env.UNDEFINED,
-      'length'
+      LENGTH
     )
 
     for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
@@ -115,7 +118,7 @@ let patternCache = { }
  *
  * @param {string} keypath
  * @param {string} pattern
- * @return {?Array.<string>}
+ * @return {boolean}
  */
 function matchKeypath(keypath, pattern) {
   let cache = patternCache[ pattern ]
@@ -126,10 +129,7 @@ function matchKeypath(keypath, pattern) {
       .replace(/\*/g, '(\\w+)')
     cache = patternCache[ pattern ] = new RegExp(`^${cache}$`)
   }
-  let match = keypath.match(cache)
-  if (match) {
-    return array.toArray(match).slice(1)
-  }
+  return cache.test(keypath)
 }
 
 /**
@@ -169,20 +169,14 @@ function matchBest(sorted, keypath) {
 
 }
 
-let guid = 0
-
-let currentComputed
-
 export class Computed {
 
   constructor(keypath, observer) {
 
-    let instance = this
-
-    instance.id = ++guid
-    instance.keypath = keypath
-    instance.observer = observer
-    instance.deps = [ ]
+    this.id = ++guid
+    this.keypath = keypath
+    this.observer = observer
+    this.deps = [ ]
 
   }
 
@@ -217,10 +211,10 @@ export class Computed {
     }
     // 减少取值频率，尤其是处理复杂的计算规则
     else  if (force || this.isDirty()) {
-      let lastComputed = currentComputed
-      currentComputed = this
+      let lastComputed = CURRENT_COMPUTED
+      CURRENT_COMPUTED = this
       value = this.value = this.getter()
-      currentComputed = lastComputed
+      CURRENT_COMPUTED = lastComputed
       this.changes = env.NULL
     }
     return value
@@ -238,8 +232,10 @@ export class Computed {
   }
 
   removeDep(dep) {
-    array.remove(this.deps, dep)
-    this.observer.unwatch(dep, this.update)
+    if (this.hasDep(dep)) {
+      array.remove(this.deps, dep)
+      this.observer.unwatch(dep, this.update)
+    }
   }
 
   clearDep() {
@@ -324,17 +320,16 @@ export class Observer {
         function () {
           if (instance.pending) {
 
-            instance.pending = env.FALSE
+            let { changes } = instance
 
-            let currentChanges = instance.changes
-
+            instance.pending =
             instance.changes = env.NULL
 
             let { asyncEmitter } = instance
             let listenerKeys = object.keys(asyncEmitter.listeners)
 
             object.each(
-              currentChanges,
+              changes,
               function (item, keypath) {
                 let { newValue, oldValue, computed } = item
                 if (computed) {
@@ -386,8 +381,8 @@ export class Observer {
 
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
-    if (currentComputed) {
-      currentComputed.addDep(keypath)
+    if (CURRENT_COMPUTED) {
+      CURRENT_COMPUTED.addDep(keypath)
     }
 
     let { computed, reversedComputedKeys } = instance
@@ -480,7 +475,7 @@ export class Observer {
       // 存在模糊匹配的需求
       // 必须对数据进行递归
       // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
-      if (fuzzyKeypaths.length) {
+      if (fuzzyKeypaths[ LENGTH ]) {
 
         let addChange = function (newValue, oldValue, key) {
           if (newValue !== oldValue) {
@@ -504,11 +499,10 @@ export class Observer {
 
             let newIs = is.string(newValue), oldIs = is.string(oldValue)
             if (newIs || oldIs) {
-              let length = 'length'
               addChange(
-                newIs ? newValue[ length ] : env.UNDEFINED,
-                oldIs ? oldValue[ length ] : env.UNDEFINED,
-                keypathUtil.join(key, length)
+                newIs ? newValue[ LENGTH ] : env.UNDEFINED,
+                oldIs ? oldValue[ LENGTH ] : env.UNDEFINED,
+                keypathUtil.join(key, LENGTH)
               )
             }
             else {
@@ -614,7 +608,7 @@ export class Observer {
       let computed = new Computed(keypath, instance)
 
       if (get) {
-        let hasDeps = is.array(deps) && deps.length > 0
+        let hasDeps = is.array(deps) && deps[ LENGTH ] > 0
         if (hasDeps) {
           array.each(
             deps,
@@ -627,7 +621,7 @@ export class Observer {
         computed.getter = function () {
           if (cache) {
             if (hasDeps) {
-              currentComputed = env.NULL
+              CURRENT_COMPUTED = env.NULL
             }
             else {
               computed.clearDep()
@@ -725,7 +719,7 @@ export class Observer {
       list = object.copy(list)
     }
 
-    let { length } = list
+    let length = list[ LENGTH ]
     if (index === env.TRUE || index === length) {
       list.push(item)
     }
@@ -756,7 +750,7 @@ export class Observer {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
-      && index < list.length
+      && index < list[ LENGTH ]
     ) {
       list = object.copy(list)
       list.splice(index, 1)
