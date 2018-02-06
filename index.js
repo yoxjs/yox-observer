@@ -178,7 +178,7 @@ export class Computed {
 
   }
 
-  update(newValue, oldValue, key) {
+  update(newValue, oldValue, key, changes) {
 
     let instance = this
     let { observer, keypath, value } = instance
@@ -192,10 +192,11 @@ export class Computed {
       observer.computed,
       function (computed, key) {
         if (computed.hasDep(keypath)) {
-          observer.emitter.fire(
-            keypath,
-            [ instance.get(), value, keypath ]
-          )
+          let newValue = instance.get()
+          if (newValue !== value) {
+            changes.push(keypath, newValue, value, keypath)
+            return env.FALSE
+          }
         }
       }
     )
@@ -301,12 +302,14 @@ export class Observer {
 
   onChange(newValue, oldValue, keypath, computed, computedValue) {
 
-    let instance = this
+    let instance = this, changes = instance.changes || (instance.changes = { })
 
-    instance.changes = updateValue(instance.changes, newValue, oldValue, keypath)
+    changes = updateValue(changes, newValue, oldValue, keypath)
 
-    if (computed && !instance.changes[ computed.keypath ]) {
-      instance.changes[ computed.keypath ] = {
+    if (computed.keypath
+      && !changes[ computed.keypath ]
+    ) {
+      changes[ computed.keypath ] = {
         computed,
         oldValue: computedValue,
       }
@@ -422,6 +425,8 @@ export class Observer {
 
     let listenKeys = object.keys(emitter.listeners)
 
+    let changes = [ ]
+
     let setValue = function (value, keypath) {
 
       keypath = keypathUtil.normalize(keypath)
@@ -455,7 +460,9 @@ export class Observer {
         function (listenKey) {
           if (isFuzzyKeypath(listenKey)) {
             if (matchKeypath(keypath, listenKey)) {
-              emitter.fire(listenKey, [ newValue, oldValue, keypath ])
+              changes.push(
+                listenKey, newValue, oldValue, keypath
+              )
             }
             else {
               array.push(fuzzyKeypaths, listenKey)
@@ -464,7 +471,9 @@ export class Observer {
           else if (string.startsWith(listenKey, keypath)) {
             let listenNewValue = getNewValue(listenKey), listenOldValue = instance.get(listenKey)
             if (listenNewValue !== listenOldValue) {
-              emitter.fire(listenKey, [ listenNewValue, listenOldValue, listenKey ])
+              changes.push(
+                listenKey, listenNewValue, listenOldValue, listenKey
+              )
             }
           }
         }
@@ -482,7 +491,9 @@ export class Observer {
               fuzzyKeypaths,
               function (fuzzyKeypath) {
                 if (matchKeypath(key, fuzzyKeypath)) {
-                  emitter.fire(fuzzyKeypath, [ newValue, oldValue, key ])
+                  changes.push(
+                    fuzzyKeypath, newValue, oldValue, key
+                  )
                 }
               }
             )
@@ -493,7 +504,6 @@ export class Observer {
             if (string.startsWith(key, '$')) {
               return
             }
-
 
             let newIs = is.string(newValue), oldIs = is.string(oldValue)
             if (newIs || oldIs) {
@@ -569,6 +579,10 @@ export class Observer {
     }
     else if (is.object(keypath)) {
       object.each(keypath, setValue)
+    }
+
+    for (let i = 0; i < changes.length; i += 4) {
+      emitter.fire(changes[ i ], [ changes[ i + 1 ], changes[ i + 2 ], changes[ i + 3 ], changes ])
     }
 
   }
