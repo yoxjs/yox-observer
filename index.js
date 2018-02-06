@@ -16,8 +16,6 @@ const LENGTH = 'length'
 
 let guid = 0
 
-let CURRENT_COMPUTED
-
 /**
  * 记录对比值
  *
@@ -211,10 +209,10 @@ export class Computed {
     }
     // 减少取值频率，尤其是处理复杂的计算规则
     else  if (force || this.isDirty()) {
-      let lastComputed = CURRENT_COMPUTED
-      CURRENT_COMPUTED = this
+      let lastComputed = Observer.computed
+      Observer.computed = this
       value = this.value = this.getter()
-      CURRENT_COMPUTED = lastComputed
+      Observer.computed = lastComputed
       this.changes = env.NULL
     }
     return value
@@ -381,8 +379,8 @@ export class Observer {
 
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
-    if (CURRENT_COMPUTED) {
-      CURRENT_COMPUTED.addDep(keypath)
+    if (Observer.computed) {
+      Observer.computed.addDep(keypath)
     }
 
     let { computed, reversedComputedKeys } = instance
@@ -621,7 +619,7 @@ export class Observer {
         computed.getter = function () {
           if (cache) {
             if (hasDeps) {
-              CURRENT_COMPUTED = env.NULL
+              Observer.computed = env.NULL
             }
             else {
               computed.clearDep()
