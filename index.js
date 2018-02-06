@@ -400,12 +400,13 @@ export class Observer {
         }
         else if (target != env.NULL) {
           result = object.get(target, prop)
-          return result ? result.value : env.UNDEFINED
         }
       }
     }
 
-    result = object.get(instance.data, keypath)
+    if (!result) {
+      result = object.get(instance.data, keypath)
+    }
 
     return result ? result.value : defaultValue
 
