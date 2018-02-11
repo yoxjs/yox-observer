@@ -12,8 +12,6 @@ import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 
-const LENGTH = 'length'
-
 let guid = 0
 
 /**
@@ -88,13 +86,13 @@ function diffArray(newArray, oldArray, callback) {
 
   if (newArray || oldArray) {
 
-    let newLength = newArray ? newArray[ LENGTH ] : 0
-    let oldLength = oldArray ? oldArray[ LENGTH ] : 0
+    let newLength = newArray ? newArray[ env.RAW_LENGTH ] : 0
+    let oldLength = oldArray ? oldArray[ env.RAW_LENGTH ] : 0
 
     callback(
       newArray ? newLength : env.UNDEFINED,
       oldArray ? oldLength : env.UNDEFINED,
-      LENGTH
+      env.RAW_LENGTH
     )
 
     for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
@@ -483,7 +481,7 @@ export class Observer {
       // 存在模糊匹配的需求
       // 必须对数据进行递归
       // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
-      if (fuzzyKeypaths[ LENGTH ]) {
+      if (fuzzyKeypaths[ env.RAW_LENGTH ]) {
 
         let addChange = function (newValue, oldValue, key) {
           if (newValue !== oldValue) {
@@ -509,9 +507,9 @@ export class Observer {
             let newIs = is.string(newValue), oldIs = is.string(oldValue)
             if (newIs || oldIs) {
               addChange(
-                newIs ? newValue[ LENGTH ] : env.UNDEFINED,
-                oldIs ? oldValue[ LENGTH ] : env.UNDEFINED,
-                keypathUtil.join(key, LENGTH)
+                newIs ? newValue[ env.RAW_LENGTH ] : env.UNDEFINED,
+                oldIs ? oldValue[ env.RAW_LENGTH ] : env.UNDEFINED,
+                keypathUtil.join(key, env.RAW_LENGTH)
               )
             }
             else {
@@ -582,7 +580,7 @@ export class Observer {
       object.each(keypath, setValue)
     }
 
-    for (let i = 0; i < changes.length; i += 4) {
+    for (let i = 0; i < changes[ env.RAW_LENGTH ]; i += 4) {
       emitter.fire(changes[ i ], [ changes[ i + 1 ], changes[ i + 2 ], changes[ i + 3 ], changes ])
     }
 
@@ -621,7 +619,7 @@ export class Observer {
       let computed = new Computed(keypath, instance)
 
       if (get) {
-        let hasDeps = is.array(deps) && deps[ LENGTH ] > 0
+        let hasDeps = is.array(deps) && deps[ env.RAW_LENGTH ] > 0
         if (hasDeps) {
           array.each(
             deps,
@@ -732,7 +730,7 @@ export class Observer {
       list = object.copy(list)
     }
 
-    let length = list[ LENGTH ]
+    let length = list[ env.RAW_LENGTH ]
     if (index === env.TRUE || index === length) {
       list.push(item)
     }
@@ -763,7 +761,7 @@ export class Observer {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
-      && index < list[ LENGTH ]
+      && index < list[ env.RAW_LENGTH ]
     ) {
       list = object.copy(list)
       list.splice(index, 1)
