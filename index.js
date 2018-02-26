@@ -467,7 +467,7 @@ export class Observer {
               array.push(fuzzyKeypaths, listenKey)
             }
           }
-          else if (string.startsWith(listenKey, keypath)) {
+          else if (keypathUtil.startsWith(listenKey, keypath)) {
             let listenNewValue = getNewValue(listenKey), listenOldValue = instance.get(listenKey)
             if (listenNewValue !== listenOldValue) {
               changes.push(
