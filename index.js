@@ -169,35 +169,35 @@ export class Computed {
 
   constructor(keypath, observer) {
 
+    this.id = ++guid
+    this.keypath = keypath
+    this.observer = observer
+    this.deps = [ ]
+
+  }
+
+  update(newValue, oldValue, key, changes) {
+
     let instance = this
+    let { observer, keypath, value } = instance
 
-    instance.id = ++guid
-    instance.keypath = keypath
-    instance.observer = observer
-    instance.deps = [ ]
+    instance.changes = updateValue(instance.changes, newValue, oldValue, key)
 
-    instance.update = function (newValue, oldValue, key, changes) {
+    observer.onChange(newValue, oldValue, key, instance, value)
 
-      let { value } = instance
-
-      instance.changes = updateValue(instance.changes, newValue, oldValue, key)
-
-      observer.onChange(newValue, oldValue, key, instance, value)
-
-      // 当前计算属性是否是其他计算属性的依赖
-      object.each(
-        observer.computed,
-        function (computed, key) {
-          if (computed.hasDep(keypath)) {
-            let newValue = instance.get()
-            if (newValue !== value) {
-              changes.push(keypath, newValue, value, keypath)
-              return env.FALSE
-            }
+    // 当前计算属性是否是其他计算属性的依赖
+    object.each(
+      observer.computed,
+      function (computed, key) {
+        if (computed.hasDep(keypath)) {
+          let newValue = instance.get()
+          if (newValue !== value) {
+            changes.push(keypath, newValue, value, keypath)
+            return env.FALSE
           }
         }
-      )
-    }
+      }
+    )
 
   }
 
@@ -581,7 +581,15 @@ export class Observer {
     }
 
     for (let i = 0; i < changes[ env.RAW_LENGTH ]; i += 4) {
-      emitter.fire(changes[ i ], [ changes[ i + 1 ], changes[ i + 2 ], changes[ i + 3 ], changes ])
+      emitter.fire(
+        changes[ i ],
+        [
+          changes[ i + 1 ],
+          changes[ i + 2 ],
+          changes[ i + 3 ],
+          changes
+        ]
+      )
     }
 
   }
