@@ -394,7 +394,7 @@ export class Observer {
       let { name, prop } = matchBest(reversedComputedKeys, keypath)
       if (name && prop) {
         target = instance.computed[ name ].get()
-        if (object.exists(target, prop)) {
+        if (object.has(target, prop)) {
           return target[ prop ]
         }
         else if (target != env.NULL) {
