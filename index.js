@@ -282,7 +282,6 @@ export class Observer {
 
     let instance = this
 
-    instance.id = ++guid
     instance.data = options.data || { }
     instance.context = options.context || instance
     instance.emitter = new Emitter()
