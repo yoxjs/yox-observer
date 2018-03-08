@@ -1,6 +1,7 @@
 
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
+import * as char from 'yox-common/util/char'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
@@ -300,7 +301,9 @@ export class Observer {
 
   onChange(newValue, oldValue, keypath, computed, computedValue) {
 
-    let instance = this, changes = instance.changes || (instance.changes = { })
+    let instance = this, changes = string.startsWith(keypath, '$')
+      ? (instance.$changes || (instance.$changes = { }))
+      : (instance.changes || (instance.changes = { }))
 
     changes = updateValue(changes, newValue, oldValue, keypath)
 
@@ -319,35 +322,36 @@ export class Observer {
         function () {
           if (instance.pending) {
 
-            let { changes } = instance
+            let { changes, $changes } = instance
 
             instance.pending =
-            instance.changes = env.NULL
+            instance.changes =
+            instance.$changes = env.NULL
 
             let { asyncEmitter } = instance
             let listenerKeys = object.keys(asyncEmitter.listeners)
 
-            object.each(
-              changes,
-              function (item, keypath) {
-                let { newValue, oldValue, computed } = item
-                if (computed) {
-                  newValue = computed.get()
-                }
-                if (newValue !== oldValue) {
-                  let args = [ newValue, oldValue, keypath ]
-                  asyncEmitter.fire(keypath, args)
-                  array.each(
-                    listenerKeys,
-                    function (key) {
-                      if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
-                        asyncEmitter.fire(key, args)
-                      }
-                    }
-                  )
-                }
+            let onChange = function (item, keypath) {
+              let { newValue, oldValue, computed } = item
+              if (computed) {
+                newValue = computed.get()
               }
-            )
+              if (newValue !== oldValue) {
+                let args = [ newValue, oldValue, keypath ]
+                asyncEmitter.fire(keypath, args)
+                array.each(
+                  listenerKeys,
+                  function (key) {
+                    if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
+                      asyncEmitter.fire(key, args)
+                    }
+                  }
+                )
+              }
+            }
+
+            $changes && object.each($changes, onChange)
+            changes && object.each(changes, onChange)
 
           }
         }
@@ -372,7 +376,7 @@ export class Observer {
     let instance = this, result
 
     // 传入 '' 获取整个 data
-    if (keypath === '') {
+    if (keypath === char.CHAR_BLANK) {
       return instance.data
     }
 
