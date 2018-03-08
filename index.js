@@ -153,7 +153,7 @@ export class Computed {
     instance.observer = observer
     instance.deps = [ ]
 
-    instance.update = function (newValue, oldValue, key, globalChanges) {
+    instance.update = function (oldValue, key, globalChanges) {
 
       let value = instance.value, changes = instance.changes || (instance.changes = { })
 
@@ -163,18 +163,17 @@ export class Computed {
       }
 
       // 把依赖和计算属性自身注册到下次可能的变化中
-      observer.onChange(newValue, oldValue, key)
+      observer.onChange(oldValue, key)
       // newValue 用不上，只是占位
-      observer.onChange(newValue, value, keypath)
+      observer.onChange(value, keypath)
 
       // 当前计算属性是否是其他计算属性的依赖
       object.each(
         observer.computed,
         function (computed) {
           if (computed.hasDep(keypath)) {
-            let newValue = instance.get()
-            if (newValue !== value) {
-              globalChanges.push(keypath, newValue, value, keypath)
+            if (instance.get() !== value) {
+              globalChanges.push(keypath, value, keypath)
               return env.FALSE
             }
           }
@@ -273,11 +272,11 @@ export class Observer {
 
   }
 
-  onChange(newValue, oldValue, keypath) {
+  onChange(oldValue, keypath) {
 
     let instance = this, changes = string.startsWith(keypath, '$')
-      ? (this.$changes || (this.$changes = { }))
-      : (this.changes || (this.changes = { }))
+      ? (instance.$changes || (instance.$changes = { }))
+      : (instance.changes || (instance.changes = { }))
 
     if (!object.has(changes, keypath)) {
       changes[ keypath ] = oldValue
@@ -289,13 +288,12 @@ export class Observer {
         function () {
           if (instance.pending) {
 
-            let { changes, $changes } = instance
+            let { changes, $changes, asyncEmitter } = instance
 
             instance.pending =
             instance.changes =
             instance.$changes = env.NULL
 
-            let { asyncEmitter } = instance
             let listenerKeys = object.keys(asyncEmitter.listeners)
 
             let eachChange = function (oldValue, keypath) {
@@ -428,7 +426,7 @@ export class Observer {
           if (isFuzzyKeypath(listenKey)) {
             if (matchKeypath(keypath, listenKey)) {
               changes.push(
-                listenKey, newValue, oldValue, keypath
+                listenKey, oldValue, keypath
               )
             }
             else {
@@ -439,7 +437,7 @@ export class Observer {
             let listenNewValue = getNewValue(listenKey), listenOldValue = instance.get(listenKey)
             if (listenNewValue !== listenOldValue) {
               changes.push(
-                listenKey, listenNewValue, listenOldValue, listenKey
+                listenKey, listenOldValue, listenKey
               )
             }
           }
@@ -459,7 +457,7 @@ export class Observer {
               function (fuzzyKeypath) {
                 if (matchKeypath(key, fuzzyKeypath)) {
                   changes.push(
-                    fuzzyKeypath, newValue, oldValue, key
+                    fuzzyKeypath, oldValue, key
                   )
                 }
               }
@@ -548,13 +546,12 @@ export class Observer {
       object.each(keypath, setValue)
     }
 
-    for (let i = 0; i < changes[ env.RAW_LENGTH ]; i += 4) {
+    for (let i = 0; i < changes[ env.RAW_LENGTH ]; i += 3) {
       emitter.fire(
         changes[ i ],
         [
           changes[ i + 1 ],
           changes[ i + 2 ],
-          changes[ i + 3 ],
           changes
         ]
       )
