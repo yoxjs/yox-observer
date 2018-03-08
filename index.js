@@ -16,30 +16,6 @@ import Emitter from 'yox-common/util/Emitter'
 let guid = 0
 
 /**
- * 记录对比值
- *
- * @param {?Object} changes
- * @param {*} newValue
- * @param {*} oldValue
- * @param {string} keypath
- */
-function updateValue(changes, newValue, oldValue, keypath) {
-  if (!changes) {
-    changes = { }
-  }
-  if (changes[ keypath ]) {
-    changes[ keypath ].newValue = newValue
-  }
-  else {
-    changes[ keypath ] = {
-      newValue,
-      oldValue,
-    }
-  }
-  return changes
-}
-
-/**
  * 对比新旧对象
  *
  * @param {?Object} newObject
@@ -177,22 +153,28 @@ export class Computed {
     instance.observer = observer
     instance.deps = [ ]
 
-    instance.update = function (newValue, oldValue, key, changes) {
+    instance.update = function (newValue, oldValue, key, globalChanges) {
 
-      let { value } = instance
+      let value = instance.value, changes = instance.changes || (instance.changes = { })
 
-      instance.changes = updateValue(instance.changes, newValue, oldValue, key)
+      // 当前计算属性的依赖发生变化
+      if (!object.has(changes, key)) {
+        changes[ key ] = oldValue
+      }
 
-      observer.onChange(newValue, oldValue, key, instance, value)
+      // 把依赖和计算属性自身注册到下次可能的变化中
+      observer.onChange(newValue, oldValue, key)
+      // newValue 用不上，只是占位
+      observer.onChange(newValue, value, keypath)
 
       // 当前计算属性是否是其他计算属性的依赖
       object.each(
         observer.computed,
-        function (computed, key) {
+        function (computed) {
           if (computed.hasDep(keypath)) {
             let newValue = instance.get()
             if (newValue !== value) {
-              changes.push(keypath, newValue, value, keypath)
+              globalChanges.push(keypath, newValue, value, keypath)
               return env.FALSE
             }
           }
@@ -249,24 +231,16 @@ export class Computed {
   }
 
   isDirty() {
-    let { changes } = this, result
-    if (isDef(changes)) {
-      if (changes) {
-        object.each(
-          changes,
-          function (item, keypath) {
-            if (item.newValue !== item.oldValue) {
-              result = env.TRUE
-              return env.FALSE
-            }
-          }
-        )
+    let { observer, changes } = this, result
+    if (changes) {
+      for (let key in changes) {
+        if (changes[ key ] !== observer.get(key)) {
+          return env.TRUE
+        }
       }
     }
-    else {
-      result = env.TRUE
-    }
-    return result
+    // undefined 表示第一次执行，要返回 true
+    return !isDef(changes)
   }
 
 }
@@ -299,32 +273,14 @@ export class Observer {
 
   }
 
-  getChanges(keypath) {
-    return string.startsWith(keypath, '$')
+  onChange(newValue, oldValue, keypath) {
+
+    let instance = this, changes = string.startsWith(keypath, '$')
       ? (this.$changes || (this.$changes = { }))
       : (this.changes || (this.changes = { }))
-  }
 
-  onChange(newValue, oldValue, keypath, computed, computedValue) {
-
-    let instance = this
-
-    updateValue(
-      this.getChanges(keypath),
-      newValue,
-      oldValue,
-      keypath
-    )
-
-    keypath = computed.keypath
-    if (keypath) {
-      let changes = this.getChanges(keypath)
-      if (!changes[ keypath ]) {
-        changes[ keypath ] = {
-          computed,
-          oldValue: computedValue,
-        }
-      }
+    if (!object.has(changes, keypath)) {
+      changes[ keypath ] = oldValue
     }
 
     if (!instance.pending) {
@@ -342,11 +298,8 @@ export class Observer {
             let { asyncEmitter } = instance
             let listenerKeys = object.keys(asyncEmitter.listeners)
 
-            let onChange = function (item, keypath) {
-              let { newValue, oldValue, computed } = item
-              if (computed) {
-                newValue = computed.get()
-              }
+            let eachChange = function (oldValue, keypath) {
+              let newValue = instance.get(keypath)
               if (newValue !== oldValue) {
                 let args = [ newValue, oldValue, keypath ]
                 asyncEmitter.fire(keypath, args)
@@ -361,8 +314,8 @@ export class Observer {
               }
             }
 
-            $changes && object.each($changes, onChange)
-            changes && object.each(changes, onChange)
+            $changes && object.each($changes, eachChange)
+            changes && object.each(changes, eachChange)
 
           }
         }
