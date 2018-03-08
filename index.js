@@ -299,20 +299,31 @@ export class Observer {
 
   }
 
+  getChanges(keypath) {
+    return string.startsWith(keypath, '$')
+      ? (this.$changes || (this.$changes = { }))
+      : (this.changes || (this.changes = { }))
+  }
+
   onChange(newValue, oldValue, keypath, computed, computedValue) {
 
-    let instance = this, changes = string.startsWith(keypath, '$')
-      ? (instance.$changes || (instance.$changes = { }))
-      : (instance.changes || (instance.changes = { }))
+    let instance = this
 
-    changes = updateValue(changes, newValue, oldValue, keypath)
+    updateValue(
+      this.getChanges(keypath),
+      newValue,
+      oldValue,
+      keypath
+    )
 
-    if (computed.keypath
-      && !changes[ computed.keypath ]
-    ) {
-      changes[ computed.keypath ] = {
-        computed,
-        oldValue: computedValue,
+    keypath = computed.keypath
+    if (keypath) {
+      let changes = this.getChanges(keypath)
+      if (!changes[ keypath ]) {
+        changes[ keypath ] = {
+          computed,
+          oldValue: computedValue,
+        }
       }
     }
 
