@@ -153,7 +153,7 @@ export class Computed {
     instance.observer = observer
     instance.deps = [ ]
 
-    instance.update = function (oldValue, key, globalChanges) {
+    instance.update = function (oldValue, key, addChange) {
 
       let value = instance.value, changes = instance.changes || (instance.changes = { })
 
@@ -164,7 +164,6 @@ export class Computed {
 
       // 把依赖和计算属性自身注册到下次可能的变化中
       observer.onChange(oldValue, key)
-      // newValue 用不上，只是占位
       observer.onChange(value, keypath)
 
       // 当前计算属性是否是其他计算属性的依赖
@@ -172,8 +171,9 @@ export class Computed {
         observer.computed,
         function (computed) {
           if (computed.hasDep(keypath)) {
-            if (instance.get() !== value) {
-              globalChanges.push(keypath, value, keypath)
+            let newValue = instance.get()
+            if (newValue !== value) {
+              addChange(newValue, value, keypath)
               return env.FALSE
             }
           }
@@ -392,31 +392,84 @@ export class Observer {
 
     let changes = [ ]
 
-    let setValue = function (value, keypath) {
+    let addFuzzyChange = function (fuzzyKeypaths, newValue, oldValue, key) {
+      if (newValue !== oldValue) {
 
-      keypath = keypathUtil.normalize(keypath)
-
-      let newValue = value, oldValue = instance.get(keypath)
-
-      if (newValue === oldValue) {
-        return
-      }
-
-      let getNewValue = function (key) {
-        if (key === keypath || value == env.NULL) {
-          return value
-        }
-        key = object.get(
-          value,
-          string.slice(
-            key,
-            keypathUtil.startsWith(key, keypath)
-          )
+        array.each(
+          fuzzyKeypaths,
+          function (fuzzyKeypath) {
+            if (matchKeypath(key, fuzzyKeypath)) {
+              changes.push(
+                fuzzyKeypath, oldValue, key
+              )
+            }
+          }
         )
-        if (key) {
-          return key.value
+
+        // 我们认为 $ 开头的变量是不可递归的
+        // 比如浏览器中常见的 $0 表示当前选中元素
+        // DOM 元素是不能递归的
+        if (string.startsWith(key, '$')) {
+          return
+        }
+
+        let newIs = is.string(newValue), oldIs = is.string(oldValue)
+        if (newIs || oldIs) {
+          addFuzzyChange(
+            fuzzyKeypaths,
+            newIs ? newValue[ env.RAW_LENGTH ] : env.UNDEFINED,
+            oldIs ? oldValue[ env.RAW_LENGTH ] : env.UNDEFINED,
+            keypathUtil.join(key, env.RAW_LENGTH)
+          )
+        }
+        else {
+          newIs = is.object(newValue), oldIs = is.object(oldValue)
+          if (newIs || oldIs) {
+            diffObject(
+              newIs && newValue,
+              oldIs && oldValue,
+              function (newValue, oldValue, prop) {
+                addFuzzyChange(
+                  fuzzyKeypaths,
+                  newValue,
+                  oldValue,
+                  keypathUtil.join(key, prop)
+                )
+              }
+            )
+          }
+          else {
+            diffArray(
+              is.array(newValue) && newValue,
+              is.array(oldValue) && oldValue,
+              function (newValue, oldValue, index) {
+                addFuzzyChange(
+                  fuzzyKeypaths,
+                  newValue,
+                  oldValue,
+                  keypathUtil.join(key, index)
+                )
+              }
+            )
+          }
+        }
+
+      }
+    }
+
+    let getValue = function (value, key) {
+      if (value == env.NULL) {
+        return value
+      }
+      else {
+        let result = object.get(value, key)
+        if (result) {
+          return result.value
         }
       }
+    }
+
+    let addChange = function (newValue, oldValue, keypath) {
 
       let fuzzyKeypaths = [ ]
 
@@ -433,12 +486,26 @@ export class Observer {
               array.push(fuzzyKeypaths, listenKey)
             }
           }
-          else if (keypathUtil.startsWith(listenKey, keypath)) {
-            let listenNewValue = getNewValue(listenKey), listenOldValue = instance.get(listenKey)
-            if (listenNewValue !== listenOldValue) {
-              changes.push(
-                listenKey, listenOldValue, listenKey
-              )
+          else {
+            let length = keypathUtil.startsWith(listenKey, keypath)
+            if (length) {
+
+              let listenNewValue, listenOldValue
+              if (listenKey === keypath) {
+                listenNewValue = newValue
+                listenOldValue = oldValue
+              }
+              else {
+                let propName = string.slice(listenKey, length)
+                listenNewValue = getValue(newValue, propName)
+                listenOldValue = getValue(oldValue, propName)
+              }
+
+              if (listenNewValue !== listenOldValue) {
+                changes.push(
+                  listenKey, listenOldValue, listenKey
+                )
+              }
             }
           }
         }
@@ -448,82 +515,30 @@ export class Observer {
       // 必须对数据进行递归
       // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
       if (fuzzyKeypaths[ env.RAW_LENGTH ]) {
-
-        let addChange = function (newValue, oldValue, key) {
-          if (newValue !== oldValue) {
-
-            array.each(
-              fuzzyKeypaths,
-              function (fuzzyKeypath) {
-                if (matchKeypath(key, fuzzyKeypath)) {
-                  changes.push(
-                    fuzzyKeypath, oldValue, key
-                  )
-                }
-              }
-            )
-
-            // 我们认为 $ 开头的变量是不可递归的
-            // 比如浏览器中常见的 $0 表示当前选中元素
-            // DOM 元素是不能递归的
-            if (string.startsWith(key, '$')) {
-              return
-            }
-
-            let newIs = is.string(newValue), oldIs = is.string(oldValue)
-            if (newIs || oldIs) {
-              addChange(
-                newIs ? newValue[ env.RAW_LENGTH ] : env.UNDEFINED,
-                oldIs ? oldValue[ env.RAW_LENGTH ] : env.UNDEFINED,
-                keypathUtil.join(key, env.RAW_LENGTH)
-              )
-            }
-            else {
-              newIs = is.object(newValue), oldIs = is.object(oldValue)
-              if (newIs || oldIs) {
-                diffObject(
-                  newIs && newValue,
-                  oldIs && oldValue,
-                  function (newValue, oldValue, prop) {
-                    addChange(
-                      newValue,
-                      oldValue,
-                      keypathUtil.join(key, prop)
-                    )
-                  }
-                )
-              }
-              else {
-                diffArray(
-                  is.array(newValue) && newValue,
-                  is.array(oldValue) && oldValue,
-                  function (newValue, oldValue, index) {
-                    addChange(
-                      newValue,
-                      oldValue,
-                      keypathUtil.join(key, index)
-                    )
-                  }
-                )
-              }
-            }
-
-          }
-        }
-
-        addChange(
-          value,
-          instance.get(keypath),
-          keypath
-        )
-
+        addFuzzyChange(fuzzyKeypaths, newValue, oldValue, keypath)
       }
+
+    }
+
+    let setValue = function (value, keypath) {
+
+      keypath = keypathUtil.normalize(keypath)
+
+      let oldValue = instance.get(keypath)
+      if (value === oldValue) {
+        return
+      }
+
+      addChange(value, oldValue, keypath)
 
       let { computed, reversedComputedKeys } = instance
       if (computed) {
         let target = computed[ keypath ]
-        if (target && target.set) {
-          target.set(value)
+        if (target) {
+          // 如果强制给没有 set 方法的计算属性设值，忽略
+          if (target.set) {
+            target.set(value)
+          }
           return
         }
         let { name, prop } = matchBest(reversedComputedKeys, keypath)
@@ -552,7 +567,7 @@ export class Observer {
         [
           changes[ i + 1 ],
           changes[ i + 2 ],
-          changes
+          addChange
         ]
       )
     }
