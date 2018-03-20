@@ -167,14 +167,25 @@ export class Computed {
       observer.onChange(value, keypath)
 
       // 当前计算属性是否是其他计算属性的依赖
+      let diff = function () {
+        let newValue = instance.get()
+        if (newValue !== value) {
+          addChange(newValue, value, keypath)
+          return env.FALSE
+        }
+      }
+
       object.each(
         observer.computed,
         function (computed) {
           if (computed.hasDep(keypath)) {
-            let newValue = instance.get()
-            if (newValue !== value) {
-              addChange(newValue, value, keypath)
-              return env.FALSE
+            return diff()
+          }
+          else {
+            for (let i = 0, len = computed.deps.length; i < len; i++) {
+              if (keypathUtil.startsWith(computed.deps[ i ], keypath)) {
+                return diff()
+              }
             }
           }
         }
