@@ -178,13 +178,16 @@ export class Computed {
       object.each(
         observer.computed,
         function (computed) {
-          if (computed.hasDep(keypath)) {
-            return diff()
-          }
-          else {
-            for (let i = 0, len = computed.deps.length; i < len; i++) {
-              if (keypathUtil.startsWith(computed.deps[ i ], keypath)) {
-                return diff()
+          if (computed.keypath !== keypath) {
+            let { deps } = computed
+            if (array.has(deps, keypath)) {
+              return diff()
+            }
+            else {
+              for (let i = 0, len = deps.length; i < len; i++) {
+                if (keypathUtil.startsWith(deps[ i ], keypath)) {
+                  return diff()
+                }
               }
             }
           }
