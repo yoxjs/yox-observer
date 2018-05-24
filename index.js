@@ -791,7 +791,17 @@ export class Observer {
   }
 
   nextTick(fn) {
-    nextTask.append(fn)
+    if (is.func(fn)) {
+      let instance = this
+      nextTask.append(
+        function () {
+          // 确保没销毁
+          if (instance.data) {
+            fn()
+          }
+        }
+      )
+    }
   }
 
   nextRun() {
