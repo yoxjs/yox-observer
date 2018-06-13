@@ -184,7 +184,7 @@ export class Computed {
               return diff()
             }
             else {
-              for (let i = 0, len = deps.length; i < len; i++) {
+              for (let i = 0, len = deps[ env.RAW_LENGTH ]; i < len; i++) {
                 if (keypathUtil.startsWith(deps[ i ], keypath)) {
                   return diff()
                 }
