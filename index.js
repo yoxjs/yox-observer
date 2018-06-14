@@ -155,7 +155,7 @@ export class Computed {
 
     instance.update = function (oldValue, key, addChange) {
 
-      let value = instance.value, changes = instance.changes || (instance.changes = { })
+      let value = instance[ env.RAW_VALUE ], changes = instance.changes || (instance.changes = { })
 
       // 当前计算属性的依赖发生变化
       if (!object.has(changes, key)) {
@@ -201,13 +201,13 @@ export class Computed {
   get(force) {
     let { value, cache } = this
     if (cache === env.FALSE) {
-      value = this.value = this.getter()
+      value = this[ env.RAW_VALUE ] = this.getter()
     }
     // 减少取值频率，尤其是处理复杂的计算规则
     else  if (force || this.isDirty()) {
       let lastComputed = Observer.computed
       Observer.computed = this
-      value = this.value = this.getter()
+      value = this[ env.RAW_VALUE ] = this.getter()
       Observer.computed = lastComputed
       this.changes = env.NULL
     }
@@ -386,7 +386,7 @@ export class Observer {
       result = object.get(instance.data, keypath)
     }
 
-    return result ? result.value : defaultValue
+    return result ? result[ env.RAW_VALUE ] : defaultValue
 
   }
 
@@ -478,7 +478,7 @@ export class Observer {
       else {
         let result = object.get(value, key)
         if (result) {
-          return result.value
+          return result[ env.RAW_VALUE ]
         }
       }
     }
