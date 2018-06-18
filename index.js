@@ -553,7 +553,7 @@ export class Observer {
           }
           return
         }
-        let match = matchBest(reversedComputedKeys, keypath)
+        let match = matchBest(reversedComputedKeys, keypath),
         name = match[ env.RAW_NAME ],
         prop = match.prop
         if (name && prop) {
