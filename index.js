@@ -131,7 +131,7 @@ function matchBest(sorted, keypath) {
     function (prefix) {
       let length = keypathUtil.startsWith(keypath, prefix)
       if (length !== env.FALSE) {
-        result.name = prefix
+        result[ env.RAW_NAME ] = prefix
         result.prop = string.slice(keypath, length)
         return env.FALSE
       }
@@ -356,8 +356,6 @@ export class Observer {
       return instance.data
     }
 
-    keypath = keypathUtil.normalize(keypath)
-
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
     if (Observer.computed) {
@@ -370,7 +368,9 @@ export class Observer {
       if (target) {
         return target.get()
       }
-      let { name, prop } = matchBest(reversedComputedKeys, keypath)
+      let match = matchBest(reversedComputedKeys, keypath),
+      name = match[ env.RAW_NAME ],
+      prop = match.prop
       if (name && prop) {
         target = instance.computed[ name ].get()
         if (object.has(target, prop)) {
@@ -536,8 +536,6 @@ export class Observer {
 
     let setValue = function (value, keypath) {
 
-      keypath = keypathUtil.normalize(keypath)
-
       let oldValue = instance.get(keypath)
       if (value === oldValue) {
         return
@@ -555,7 +553,9 @@ export class Observer {
           }
           return
         }
-        let { name, prop } = matchBest(reversedComputedKeys, keypath)
+        let match = matchBest(reversedComputedKeys, keypath)
+        name = match[ env.RAW_NAME ],
+        prop = match.prop
         if (name && prop) {
           target = computed[ name ].get()
           if (!is.primitive(target)) {
