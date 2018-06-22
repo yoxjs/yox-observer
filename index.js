@@ -149,7 +149,7 @@ export class Computed {
     let instance = this
 
     instance.id = ++guid
-    instance.keypath = keypath
+    instance[ env.RAW_KEYPATH ] = keypath
     instance.observer = observer
     instance.deps = [ ]
 
@@ -178,7 +178,7 @@ export class Computed {
       object.each(
         observer.computed,
         function (computed) {
-          if (computed.keypath !== keypath) {
+          if (computed[ env.RAW_KEYPATH ] !== keypath) {
             let { deps } = computed
             if (array.has(deps, keypath)) {
               return diff()
@@ -199,7 +199,7 @@ export class Computed {
   }
 
   get(force) {
-    let { value, cache } = this
+    let value = this[ env.RAW_VALUE ], cache = this.cache
     if (cache === env.FALSE) {
       value = this[ env.RAW_VALUE ] = this.getter()
     }
