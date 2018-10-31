@@ -850,14 +850,14 @@ object.extend(
     unwatch: function (keypath, watcher) {
       let { emitter, asyncEmitter } = this
       if (is.string(keypath)) {
-        emitter.off(keypath, watcher)
+        emitter.off(keypath, watcher.link || watcher)
         asyncEmitter.off(keypath, watcher)
       }
       else if (is.object(keypath)) {
         object.each(
           keypath,
           function (watcher, keypath) {
-            emitter.off(keypath, watcher)
+            emitter.off(keypath, watcher.link || watcher)
             asyncEmitter.off(keypath, watcher)
           }
         )
@@ -873,15 +873,18 @@ function createWatch(action) {
 
     let { context } = instance
 
-    instance.emitter[ action ](
-      keypath,
-      {
-        func: computed ? func : instance.onChange,
-        context: computed ? computed : instance,
-      }
-    )
+    // 同步回调
+    let syncFunc
 
     if (!computed) {
+      // 不用直接引用 instance.onChange
+      // 避免 onChange 被多处引用，解绑会出问题
+      syncFunc = function (oldValue, keypath) {
+        instance.onChange(oldValue, keypath)
+      }
+      func.link = syncFunc
+
+      // 设置异步回调
       instance.asyncEmitter[ action ](
         keypath,
         {
@@ -890,6 +893,14 @@ function createWatch(action) {
         }
       )
     }
+
+    instance.emitter[ action ](
+      keypath,
+      {
+        func: syncFunc || func,
+        context: computed || instance,
+      }
+    )
 
     if (sync) {
       execute(
