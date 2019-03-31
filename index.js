@@ -8,7 +8,6 @@ import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 import * as keypathUtil from 'yox-common/util/keypath'
 
-import isDef from 'yox-common/function/isDef'
 import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
@@ -365,9 +364,7 @@ export class Observer {
         let target = computed[ keypath ]
         if (target) {
           // 如果强制给没有 set 方法的计算属性设值，忽略
-          if (target.set) {
-            target.set(value)
-          }
+          target.set(value)
           return
         }
         let match = matchBest(reversedComputedKeys, keypath),
@@ -413,59 +410,9 @@ export class Observer {
    */
   addComputed(keypath, computed) {
 
-    let instance = this, cache = env.TRUE, get, set, deps
+    const computed = Computed.build(keypath, instance.context, computed)
 
-    if (is.func(computed)) {
-      get = computed
-    }
-    else if (is.object(computed)) {
-      if (is.boolean(computed.cache)) {
-        cache = computed.cache
-      }
-      if (is.func(computed.get)) {
-        get = computed.get
-      }
-      if (is.func(computed.set)) {
-        set = computed.set
-      }
-      if (computed.deps) {
-        deps = computed.deps
-      }
-    }
-
-    if (get || set) {
-
-      let computed = new Computed(keypath, instance)
-
-      if (get) {
-        let hasDeps = is.array(deps) && deps[ env.RAW_LENGTH ] > 0
-        if (hasDeps) {
-          array.each(
-            deps,
-            function (dep) {
-              computed.addDep(dep)
-            }
-          )
-        }
-        computed.cache = cache
-        computed.getter = function () {
-          if (cache) {
-            if (hasDeps) {
-              Observer.computed = env.NULL
-            }
-            else {
-              computed.clearDep()
-            }
-          }
-          return execute(get, instance.context)
-        }
-      }
-
-      if (set) {
-        computed.set = function (value) {
-          set.call(instance.context, value)
-        }
-      }
+    if (computed) {
 
       if (!instance.computed) {
         instance.computed = { }

@@ -1,78 +1,79 @@
-import isDef from 'yox-common/function/isDef'
 import execute from 'yox-common/function/execute'
+import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
-import * as object from 'yox-common/util/object'
 import * as logger from 'yox-common/util/logger'
 
-let guid = 0
-
+/**
+ * 计算属性
+ *
+ * 可配置 cache、dep、get 等
+ */
 export class Computed {
 
   static current?: Computed
 
-  id: number
+  /**
+   * 对外的构造器，把用户配置的计算属性对象转换成内部对象
+   *
+   * @param keypath
+   * @param context
+   * @param options
+   */
+  static build(keypath: string, context: any, options: any): Computed | void {
+
+    let cache = env.TRUE, deps = [], getter: Function, setter: Function
+
+    if (is.func(options)) {
+      getter = options
+    }
+    else if (is.object(options)) {
+      if (is.boolean(options.cache)) {
+        cache = options.cache
+      }
+      if (is.array(options.deps)) {
+        deps = options.deps
+      }
+      if (is.func(options.get)) {
+        getter = options.get
+      }
+      if (is.func(options.set)) {
+        setter = options.set
+      }
+    }
+
+    if (getter || setter) {
+      return new Computed(keypath, cache, deps, getter, setter, context)
+    }
+
+  }
+
   value: any
   frozen: boolean
-  changes?: Object = env.UNDEFINED
 
-  constructor(public keypath: string, public cache: boolean, public deps: string[], public getter: () => any, public context: any) {
+  private constructor(
+    public keypath: string, public cache: boolean, public deps: string[],
+    public getter: Function, public setter: Function, public context: any
+  ) {
 
     const instance = this
-
-    instance.id = ++guid
-    instance.deps = []
 
     if (deps.length > 0) {
       array.each(
         deps,
         function (dep) {
-          instance.addDep(dep)
+          instance.add(dep)
         }
       )
       instance.frozen = env.TRUE
     }
 
-    instance.update = function (oldValue, key, addChange) {
+    instance.update = function () {
 
-      let value = instance.value, changes = instance.changes || (instance.changes = {})
+      let oldValue = instance.value
+      if (instance.get(env.TRUE) !== oldValue) {
 
-      // 当前计算属性的依赖发生变化
-      if (!object.has(changes, key)) {
-        changes[key] = oldValue
       }
-
-      // 把依赖和计算属性自身注册到下次可能的变化中
-      observer.onChange(oldValue, key)
-      observer.onChange(value, keypath)
-
-      // 当前计算属性是否是其他计算属性的依赖
-      let diff = function () {
-        let newValue = instance.get()
-        if (newValue !== value) {
-          addChange(newValue, value, keypath)
-          return env.FALSE
-        }
-      }
-
-      object.each(
-        observer.computed,
-        function (computed) {
-          if (computed[env.RAW_KEYPATH] !== keypath) {
-            let { deps } = computed
-            if (array.has(deps, keypath)) {
-              return diff()
-            }
-            else {
-              for (let i = 0, len = deps[env.RAW_LENGTH]; i < len; i++) {
-                if (keypathUtil.startsWith(deps[i], keypath)) {
-                  return diff()
-                }
-              }
-            }
-          }
-        }
-      )
 
     }
 
@@ -94,7 +95,7 @@ export class Computed {
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
-    else if (force || instance.isDirty()) {
+    else if (force) {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.frozen) {
@@ -102,20 +103,24 @@ export class Computed {
       }
       else {
         // 清空上次收集的依赖
-        instance.clearDep()
+        instance.clear()
 
         // 开始收集新的依赖
         let lastComputed = Computed.current
         Computed.current = instance
         instance.value = execute(getter, context)
         Computed.current = lastComputed
-
-        // 刷新 changes
-        instance.changes = env.NULL
       }
 
     }
     return instance.value
+  }
+
+  set(value: any) {
+    const instance = this
+    if (instance.setter) {
+      instance.setter.call(instance.context, value)
+    }
   }
 
   /**
@@ -123,7 +128,7 @@ export class Computed {
    *
    * @param dep
    */
-  hasDep(dep: string) {
+  has(dep: string) {
     return array.has(this.deps, dep)
   }
 
@@ -132,10 +137,10 @@ export class Computed {
    *
    * @param dep
    */
-  addDep(dep: string) {
+  add(dep: string) {
     const instance = this
     instance.checkFrozen()
-    if (!instance.hasDep(dep)) {
+    if (!instance.has(dep)) {
       array.push(instance.deps, dep)
       instance.observer.watch(dep, instance.update, env.FALSE, instance)
     }
@@ -146,7 +151,7 @@ export class Computed {
    *
    * @param dep
    */
-  removeDep(dep: string) {
+  remove(dep: string) {
     const instance = this
     instance.checkFrozen()
     if (array.remove(instance.deps, dep) > 0) {
@@ -157,13 +162,13 @@ export class Computed {
   /**
    * 清空依赖
    */
-  clearDep() {
+  clear() {
     const instance = this
     instance.checkFrozen()
     array.each(
       instance.deps,
       function (dep) {
-        instance.removeDep(dep)
+        instance.remove(dep)
       },
       env.TRUE
     )
@@ -173,19 +178,6 @@ export class Computed {
     if (this.frozen) {
       logger.fatal('the computed object is frozen, you can not modify deps')
     }
-  }
-
-  isDirty() {
-    let { observer, changes } = this, result
-    if (changes) {
-      for (let key in changes) {
-        if (changes[key] !== observer.get(key)) {
-          return env.TRUE
-        }
-      }
-    }
-    // undefined 表示第一次执行，要返回 true
-    return !isDef(changes)
   }
 
 }
