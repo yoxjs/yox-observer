@@ -13,11 +13,12 @@ import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 import Computed from './Computed';
 import isFuzzyKeypath from './function/isFuzzyKeypath';
+import matchFuzzyKeypath from './function/matchFuzzyKeypath';
 import matchBest from './function/matchBest';
-import matchKeypath from './function/matchKeypath';
 import diffObject from './function/diffObject';
 import diffArray from './function/diffArray';
 import readValue from './function/readValue';
+import diffString from './function/diffString';
 
 
 export default class Observer {
@@ -31,6 +32,8 @@ export default class Observer {
   computed: any
 
   reversedComputedKeys?: string[]
+
+  pending: boolean
 
   constructor(context?: any, computed = env.NULL, public data = {}) {
 
@@ -83,7 +86,7 @@ export default class Observer {
                 array.each(
                   listenerKeys,
                   function (key) {
-                    if (isFuzzyKeypath(key) && matchKeypath(keypath, key)) {
+                    if (isFuzzyKeypath(key) && matchFuzzyKeypath(keypath, key)) {
                       asyncEmitter.fire(key, args)
                     }
                   }
@@ -165,20 +168,27 @@ export default class Observer {
     const { emitter } = instance
 
     // 同步监听的 keypath
-    let listenKeypaths = object.keys(emitter.listeners)
+    const listenKeypaths = object.keys(emitter.listeners)
 
-    // 三个元素算一个整体，第一个表示监听的 keypath，第二个表示旧值，第三个表示实际的 keypath
+    // 三个元素算作一个整体
+    // 第一个表示监听的 keypath
+    // 第二个表示旧值
+    // 第三个表示实际的 keypath
     let changes = []
 
-    let addFuzzyChange = function (fuzzyKeypaths: string[], newValue: any, oldValue: any, key: string) {
+
+
+    let addFuzzyChange = function (fuzzyKeypaths: string[], newValue: any, oldValue: any, keypath: string) {
       if (newValue !== oldValue) {
+
+        // fuzzyKeypaths 全是模糊的 keypath
 
         array.each(
           fuzzyKeypaths,
           function (fuzzyKeypath) {
-            if (matchKeypath(key, fuzzyKeypath)) {
+            if (matchFuzzyKeypath(keypath, fuzzyKeypath)) {
               changes.push(
-                fuzzyKeypath, oldValue, key
+                fuzzyKeypath, oldValue, keypath
               )
             }
           }
@@ -187,50 +197,25 @@ export default class Observer {
         // 我们认为 $ 开头的变量是不可递归的
         // 比如浏览器中常见的 $0 表示当前选中元素
         // DOM 元素是不能递归的
-        if (string.startsWith(key, '$')) {
+        if (char.codeAt(keypath) === 36) {
           return
         }
 
-        let newIs = is.string(newValue), oldIs = is.string(oldValue)
-        if (newIs || oldIs) {
+        let diffCallback = function (newValue: any, oldValue: any, propName: string | number) {
           addFuzzyChange(
             fuzzyKeypaths,
-            newIs ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
-            oldIs ? oldValue[env.RAW_LENGTH] : env.UNDEFINED,
-            keypathUtil.join(key, env.RAW_LENGTH)
+            newValue,
+            oldValue,
+            keypathUtil.join(keypath, propName)
           )
         }
-        else {
-          newIs = is.object(newValue), oldIs = is.object(oldValue)
-          if (newIs || oldIs) {
-            diffObject(
-              newIs && newValue,
-              oldIs && oldValue,
-              function (newValue, oldValue, prop) {
-                addFuzzyChange(
-                  fuzzyKeypaths,
-                  newValue,
-                  oldValue,
-                  keypathUtil.join(key, prop)
-                )
-              }
-            )
-          }
-          else {
-            diffArray(
-              is.array(newValue) && newValue,
-              is.array(oldValue) && oldValue,
-              function (newValue, oldValue, index) {
-                addFuzzyChange(
-                  fuzzyKeypaths,
-                  newValue,
-                  oldValue,
-                  keypathUtil.join(key, index)
-                )
-              }
-            )
-          }
-        }
+
+        // 先 array 再 object
+        // 因为 array 也是一种 object
+
+        diffString(newValue, oldValue, diffCallback)
+          || diffArray(newValue, oldValue, diffCallback)
+          || diffObject(newValue, oldValue, diffCallback)
 
       }
     }
@@ -239,20 +224,15 @@ export default class Observer {
 
       let fuzzyKeypaths = []
 
+      // 只收集正在监听的 keypath
       array.each(
         listenKeypaths,
         function (listenKeypath) {
           if (isFuzzyKeypath(listenKeypath)) {
-            if (matchKeypath(keypath, listenKeypath)) {
-              changes.push(
-                listenKeypath, oldValue, keypath
-              )
-            }
-            else {
-              array.push(
-                fuzzyKeypaths, listenKeypath
-              )
-            }
+            array.push(
+              fuzzyKeypaths,
+              listenKeypath
+            )
           }
           else {
             let listenNewValue: any, listenOldValue: any
@@ -305,6 +285,7 @@ export default class Observer {
         const match = matchBest(reversedComputedKeys, keypath)
         if (match && match.prop) {
           target = computed[match.name].get()
+          // 如果 target 是基本类型，则忽略此次设值
           if (!is.primitive(target)) {
             object.set(target, match.prop, value)
           }

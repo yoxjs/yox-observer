@@ -1,32 +1,40 @@
+import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 
 /**
  * 对比新旧数组
  *
- * @param newArray
- * @param oldArray
+ * @param newValue
+ * @param oldValue
  * @param callback
  */
-export default function diffArray(newArray: any[] | void, oldArray: any[] | void, callback: (newValue: any, oldValue: any, key: string | number) => void) {
+export default function (
+  newValue: any,
+  oldValue: any,
+  callback: (newValue: any, oldValue: any, key: string | number) => void
+): boolean {
 
-  if (newArray || oldArray) {
+  const newIsArray = is.array(newValue), oldIsArray = is.array(oldValue)
+  if (newIsArray || oldIsArray) {
 
-    const newLength = newArray ? newArray.length : 0
-    const oldLength = oldArray ? oldArray.length : 0
+    const newLength = newIsArray ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
+      oldLength = oldIsArray ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
 
     callback(
-      newArray ? newLength : env.UNDEFINED,
-      oldArray ? oldLength : env.UNDEFINED,
+      newLength,
+      oldLength,
       env.RAW_LENGTH
     )
 
-    for (let i = 0, length = Math.max(newLength, oldLength); i < length; i++) {
+    for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
-        newArray ? newArray[i] : env.UNDEFINED,
-        oldArray ? oldArray[i] : env.UNDEFINED,
+        newValue ? newValue[i] : env.UNDEFINED,
+        oldValue ? oldValue[i] : env.UNDEFINED,
         i
       )
     }
+
+    return env.TRUE
 
   }
 

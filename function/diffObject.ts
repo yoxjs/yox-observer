@@ -1,3 +1,4 @@
+import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
@@ -5,21 +6,26 @@ import * as object from 'yox-common/util/object'
 /**
  * 对比新旧对象
  *
- * @param newObject
- * @param oldObject
+ * @param newValue
+ * @param oldValue
  * @param callback
  */
-export default function diffObject(newObject: Object | void, oldObject: Object | void, callback: (newValue: any, oldValue: any, key: string) => void) {
+export default function (
+  newValue: any,
+  oldValue: any,
+  callback: (newValue: any, oldValue: any, key: string) => void
+): boolean {
 
   let keys: string[]
 
-  if (oldObject) {
+  const newIsObject = is.object(newValue), oldIsObject = is.object(oldValue)
+  if (oldIsObject) {
     keys = object.keys(
-      newObject ? object.extend({}, oldObject, newObject) : oldObject
+      newIsObject ? object.extend({}, oldValue, newValue) : oldValue
     )
   }
-  else if (newObject) {
-    keys = object.keys(newObject)
+  else if (newIsObject) {
+    keys = object.keys(newValue)
   }
 
   if (keys) {
@@ -27,11 +33,12 @@ export default function diffObject(newObject: Object | void, oldObject: Object |
       keys,
       function (key) {
         callback(
-          newObject ? newObject[key] : env.UNDEFINED,
-          oldObject ? oldObject[key] : env.UNDEFINED,
+          newIsObject ? newValue[key] : env.UNDEFINED,
+          oldIsObject ? oldValue[key] : env.UNDEFINED,
           key
         )
       }
     )
+    return env.TRUE
   }
 }

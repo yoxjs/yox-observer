@@ -6,7 +6,7 @@ export default function (source: any, keypath: string): any {
     return source
   }
   else {
-    let result = object.get(source, keypath)
+    const result = object.get(source, keypath)
     if (result) {
       return result.value
     }
