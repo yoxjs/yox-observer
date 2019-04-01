@@ -9,7 +9,7 @@ import * as object from 'yox-common/util/object'
  * @param oldObject
  * @param callback
  */
-function diffObject(newObject?: Object, oldObject?: Object, callback?: (newValue: any, oldValue: any, key: string) => void) {
+export default function diffObject(newObject: Object | void, oldObject: Object | void, callback: (newValue: any, oldValue: any, key: string) => void) {
 
   let keys: string[]
 

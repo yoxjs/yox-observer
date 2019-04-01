@@ -3,16 +3,16 @@ import * as env from 'yox-common/util/env'
 /**
  * 对比新旧数组
  *
- * @param {?Array} newArray
- * @param {?Array} oldArray
- * @param {Function} callback
+ * @param newArray
+ * @param oldArray
+ * @param callback
  */
-function diffArray(newArray?: any[], oldArray?: any[], callback?: (newValue: any, oldValue: any, key: string | number) => void) {
+export default function diffArray(newArray: any[] | void, oldArray: any[] | void, callback: (newValue: any, oldValue: any, key: string | number) => void) {
 
   if (newArray || oldArray) {
 
-    let newLength = newArray ? newArray.length : 0
-    let oldLength = oldArray ? oldArray.length : 0
+    const newLength = newArray ? newArray.length : 0
+    const oldLength = oldArray ? oldArray.length : 0
 
     callback(
       newArray ? newLength : env.UNDEFINED,

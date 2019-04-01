@@ -9,7 +9,7 @@ import * as logger from 'yox-common/util/logger'
  *
  * 可配置 cache、dep、get 等
  */
-export class Computed {
+export default  class Computed {
 
   static current?: Computed
 
