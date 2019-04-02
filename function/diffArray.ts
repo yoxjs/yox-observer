@@ -11,7 +11,7 @@ import * as env from 'yox-common/util/env'
 export default function (
   newValue: any,
   oldValue: any,
-  callback: (newValue: any, oldValue: any, key: string | number) => void
+  callback: (key: string | number, newValue: any, oldValue: any) => void
 ): boolean {
 
   const newIsArray = is.array(newValue), oldIsArray = is.array(oldValue)
@@ -21,16 +21,16 @@ export default function (
       oldLength = oldIsArray ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
 
     callback(
+      env.RAW_LENGTH,
       newLength,
-      oldLength,
-      env.RAW_LENGTH
+      oldLength
     )
 
     for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
+        i,
         newValue ? newValue[i] : env.UNDEFINED,
-        oldValue ? oldValue[i] : env.UNDEFINED,
-        i
+        oldValue ? oldValue[i] : env.UNDEFINED
       )
     }
 

@@ -44,7 +44,7 @@ export default class Observer {
 
   asyncEmitter = new Emitter()
 
-  asyncChanges = { }
+  asyncChanges = [ ]
 
   computed: any
 
@@ -180,19 +180,19 @@ export default class Observer {
 
     const instance = this,
 
-    { syncEmitter, asyncEmitter } = instance,
+    { syncEmitter, asyncEmitter, asyncChanges } = instance,
 
     // 设值要触发`同步`监听
     syncKeypaths = object.keys(syncEmitter.listeners),
 
-    // 设值要触发`同步`监听
+    // 设值要触发`异步`监听
     asyncKeypaths = object.keys(asyncEmitter.listeners),
 
     // 三个元素算作一个整体
     // 第一个表示监听的 keypath
-    // 第二个表示旧值
-    // 第三个表示实际的 keypath
-    asyncChanges = [],
+    // 第二个表示实际的 keypath
+    // 第三个表示旧值
+    changes = [ ],
 
     setValue = function (value: any, keypath: string) {
 
@@ -201,11 +201,14 @@ export default class Observer {
         return
       }
 
-      const syncChanges = []
+      changes[env.RAW_LENGTH] = 0
 
       // 在真正设值之前调用，可取到 oldValue
-      addChange(syncKeypaths, syncChanges, keypath, value, oldValue)
-      addChange(asyncKeypaths, asyncChanges, keypath, value, oldValue)
+      addChange(syncKeypaths, keypath, value, oldValue)
+
+      const divider = changes[env.RAW_LENGTH]
+
+      addChange(asyncKeypaths, keypath, value, oldValue)
 
       const { computed, reversedComputedKeys } = instance
 
@@ -233,13 +236,26 @@ export default class Observer {
       }
 
       // 触发同步监听
-
+      for (let i = 0, len = changes[env.RAW_LENGTH]; i < len; i += 3) {
+        if (i < divider) {
+          syncEmitter.fire(changes[i])
+        }
+        else {
+          asyncChanges.
+        }
+      }
 
     },
 
     addChange = function (watchKeypaths: string[], keypath: string, newValue: any, oldValue: any) {
 
-      const fuzzyKeypaths = [], changes = []
+
+      const fuzzyKeypaths = [],
+
+      // 我们认为 $ 开头的变量是不可递归的
+      // 比如浏览器中常见的 $0 表示当前选中元素
+      // DOM 元素是不能递归的
+      isRecursive = char.codeAt(keypath) !== 36
 
       // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
       array.each(
@@ -259,7 +275,7 @@ export default class Observer {
                 watchKeypath, keypath, oldValue
               )
             }
-            else {
+            else if (isRecursive) {
               array.push(
                 fuzzyKeypaths,
                 watchKeypath
@@ -289,61 +305,39 @@ export default class Observer {
       // 存在模糊匹配的需求
       // 必须对数据进行递归
       // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
-      if (fuzzyKeypaths.length) {
-        addFuzzyChange(fuzzyKeypaths, changes, keypath, newValue, oldValue)
+      if (fuzzyKeypaths[env.RAW_LENGTH]) {
+        addFuzzyChange(fuzzyKeypaths, keypath, newValue, oldValue)
       }
 
     },
 
-    addFuzzyChange = function (fuzzyKeypaths: string[], changes: any[], keypath: string, newValue: any, oldValue: any) {
-      if (newValue !== oldValue) {
+    addFuzzyChange = function (fuzzyKeypaths: string[], keypath: string, newValue: any, oldValue: any) {
 
-        // fuzzyKeypaths 全是模糊的 keypath
+      const callback = function (subKeypath: string | number, subNewValue: any, subOldValue: any) {
 
-        array.each(
-          fuzzyKeypaths,
-          function (fuzzyKeypath) {
-            if (matchFuzzyKeypath(keypath, fuzzyKeypath)) {
-              changes.push(
-                fuzzyKeypath, oldValue, keypath
-              )
-            }
-          }
-        )
+        if (subNewValue !== subOldValue) {
 
-        // 我们认为 $ 开头的变量是不可递归的
-        // 比如浏览器中常见的 $0 表示当前选中元素
-        // DOM 元素是不能递归的
-        if (char.codeAt(keypath) === 36) {
-          return
-        }
-
-        let diffCallback = function (newValue: any, oldValue: any, propName: string | number) {
-          addFuzzyChange(
+          array.each(
             fuzzyKeypaths,
-            newValue,
-            oldValue,
-            keypathUtil.join(keypath, propName)
+            function (fuzzyKeypath) {
+              if (matchFuzzyKeypath(keypath, fuzzyKeypath)) {
+                changes.push(
+                  fuzzyKeypath, keypath, oldValue
+                )
+              }
+            }
           )
+
+          addFuzzyChange(fuzzyKeypaths, keypathUtil.join(keypath, subKeypath), subNewValue, subOldValue)
         }
-
-        // 先 array 再 object
-        // 因为 array 也是一种 object
-
-        diffString(newValue, oldValue, diffCallback)
-          || diffArray(newValue, oldValue, diffCallback)
-          || diffObject(newValue, oldValue, diffCallback)
 
       }
+
+      diffString(newValue, oldValue, callback)
+        || diffArray(newValue, oldValue, callback)
+        || diffObject(newValue, oldValue, callback)
+
     }
-
-
-    /**
-     * 设值会遍历监听的每个 keypath
-     * 如果监听项疑似变化，则会加入对应的数组
-     *
-     */
-
 
     if (is.string(keypath)) {
       setValue(value, keypath)
@@ -351,6 +345,14 @@ export default class Observer {
     else if (is.object(keypath)) {
       object.each(keypath, setValue)
     }
+
+  }
+
+  beforeSet() {
+
+  }
+
+  afterSet() {
 
   }
 
@@ -577,7 +579,7 @@ export default class Observer {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
-      && index < list.length
+      && index < list[env.RAW_LENGTH]
     ) {
       list = object.copy(list)
       list.splice(index, 1)

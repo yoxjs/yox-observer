@@ -13,7 +13,7 @@ import * as object from 'yox-common/util/object'
 export default function (
   newValue: any,
   oldValue: any,
-  callback: (newValue: any, oldValue: any, key: string) => void
+  callback: (key: string, newValue: any, oldValue: any) => void
 ): boolean {
 
   let keys: string[]
@@ -33,9 +33,9 @@ export default function (
       keys,
       function (key) {
         callback(
+          key,
           newIsObject ? newValue[key] : env.UNDEFINED,
-          oldIsObject ? oldValue[key] : env.UNDEFINED,
-          key
+          oldIsObject ? oldValue[key] : env.UNDEFINED
         )
       }
     )

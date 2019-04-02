@@ -11,15 +11,15 @@ import * as env from 'yox-common/util/env'
 export default function (
   newValue: any,
   oldValue: any,
-  callback: (newValue: any, oldValue: any, key: string) => void
+  callback: (key: string, newValue: any, oldValue: any) => void
 ): boolean {
 
   const newIsString = is.string(newValue), oldIsString = is.string(oldValue)
   if (newIsString || oldIsString) {
     callback(
+      env.RAW_LENGTH,
       newIsString ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
-      oldIsString ? oldValue[env.RAW_LENGTH] : env.UNDEFINED,
-      env.RAW_LENGTH
+      oldIsString ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
     )
     return env.TRUE
   }
