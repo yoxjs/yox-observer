@@ -44,11 +44,13 @@ export default class Observer {
 
   asyncEmitter = new Emitter()
 
+  asyncChanges = { }
+
   computed: any
 
   reversedComputedKeys?: string[]
 
-  pending: boolean
+  pendding: boolean
 
   constructor(context?: any, computed = env.NULL, public data = {}) {
 
@@ -176,22 +178,111 @@ export default class Observer {
    */
   set(keypath: any, value: any) {
 
-    const instance = this
+    const instance = this,
 
-    const { syncEmitter } = instance
+    { syncEmitter, asyncEmitter } = instance,
 
     // 设值要触发`同步`监听
-    const listenKeypaths = object.keys(syncEmitter.listeners)
+    syncKeypaths = object.keys(syncEmitter.listeners),
+
+    // 设值要触发`同步`监听
+    asyncKeypaths = object.keys(asyncEmitter.listeners),
 
     // 三个元素算作一个整体
     // 第一个表示监听的 keypath
     // 第二个表示旧值
     // 第三个表示实际的 keypath
-    let changes = []
+    syncChanges = [],
+    asyncChanges = [],
 
+    setValue = function (value: any, keypath: string) {
 
+      const oldValue = instance.get(keypath)
+      if (value === oldValue) {
+        return
+      }
 
-    let addFuzzyChange = function (fuzzyKeypaths: string[], newValue: any, oldValue: any, keypath: string) {
+      // 在真正设值之前调用，可取到 oldValue
+      addChange(syncKeypaths, syncChanges, keypath, value, oldValue)
+      addChange(asyncKeypaths, asyncChanges, keypath, value, oldValue)
+
+      const { computed, reversedComputedKeys } = instance
+      if (computed) {
+        let target = computed[keypath]
+        if (target) {
+          target.set(value)
+          return
+        }
+        const match = matchBest(reversedComputedKeys, keypath)
+        if (match && match.prop) {
+          target = computed[match.name].get()
+          // 如果 target 是基本类型，则忽略此次设值
+          if (!is.primitive(target)) {
+            object.set(target, match.prop, value)
+          }
+          return
+        }
+      }
+      object.set(instance.data, keypath, value)
+
+    },
+
+    addChange = function (watchKeypaths: string[], changes: string[], keypath: string, newValue: any, oldValue: any) {
+
+      const fuzzyKeypaths = []
+
+      // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
+      array.each(
+        watchKeypaths,
+        function (watchKeypath) {
+
+          // 模糊监听，如 users.*.name
+          if (isFuzzyKeypath(watchKeypath)) {
+
+            // 如果当前修改的是 users.0 整个对象
+            // users.0 和 users.*.name 无法匹配
+            // 此时要知道设置 users.0 到底会不会改变 users.*.name 需要靠递归了
+
+            // 如果匹配，则无需递归
+            if (matchFuzzyKeypath(keypath, watchKeypath)) {
+              changes.push(
+                watchKeypath, oldValue, keypath
+              )
+            }
+            else {
+              array.push(fuzzyKeypaths, watchKeypath)
+            }
+
+            return
+          }
+
+          // 不是模糊匹配，直接靠前缀匹配
+          // 比如监听的是 users.0.name，此时修改 users.0，则直接读出子属性值，判断是否相等
+          const length = keypathUtil.match(watchKeypath, keypath)
+          if (length >= 0) {
+            const subKeypath = string.slice(watchKeypath, length),
+            subNewValue = readValue(newValue, subKeypath),
+            subOldValue = readValue(oldValue, subKeypath)
+            if (subNewValue !== subOldValue) {
+              changes.push(
+                watchKeypath, subOldValue, watchKeypath
+              )
+            }
+          }
+
+        }
+      )
+
+      // 存在模糊匹配的需求
+      // 必须对数据进行递归
+      // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
+      if (fuzzyKeypaths.length) {
+        addFuzzyChange(fuzzyKeypaths, newValue, oldValue, keypath)
+      }
+
+    },
+
+    addFuzzyChange = function (fuzzyKeypaths: string[], newValue: any, oldValue: any, keypath: string) {
       if (newValue !== oldValue) {
 
         // fuzzyKeypaths 全是模糊的 keypath
@@ -233,100 +324,19 @@ export default class Observer {
       }
     }
 
-    let addChange = function (newValue: any, oldValue: any, keypath: string) {
 
-      let fuzzyKeypaths = []
+    /**
+     * 设值会遍历监听的每个 keypath
+     * 如果监听项疑似变化，则会加入对应的数组
+     *
+     */
 
-      // 只收集正在监听的 keypath
-      array.each(
-        listenKeypaths,
-        function (listenKeypath) {
-          if (isFuzzyKeypath(listenKeypath)) {
-            array.push(
-              fuzzyKeypaths,
-              listenKeypath
-            )
-          }
-          else {
-            let listenNewValue: any, listenOldValue: any
-            if (listenKeypath === keypath) {
-              listenNewValue = newValue
-              listenOldValue = oldValue
-            }
-            else {
-              let length = keypathUtil.match(listenKeypath, keypath)
-              if (length > 0) {
-                let propName = string.slice(listenKeypath, length)
-                listenNewValue = readValue(newValue, propName)
-                listenOldValue = readValue(oldValue, propName)
-              }
-            }
-            if (listenNewValue !== listenOldValue) {
-              changes.push(
-                listenKeypath, listenOldValue, listenKeypath
-              )
-            }
-          }
-        }
-      )
-
-      // 存在模糊匹配的需求
-      // 必须对数据进行递归
-      // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
-      if (fuzzyKeypaths.length) {
-        addFuzzyChange(fuzzyKeypaths, newValue, oldValue, keypath)
-      }
-
-    }
-
-    let setValue = function (value: any, keypath: string) {
-
-      const oldValue = instance.get(keypath)
-      if (value === oldValue) {
-        return
-      }
-
-      // 在真正设值之前调用，可取到 oldValue
-      // 比如 set('user.name', 'musicode')
-      // 此时有一个计算属性依赖了 user.name，此时就要更新计算属性的值
-      addChange(value, oldValue, keypath)
-
-      const { computed, reversedComputedKeys } = instance
-      if (computed) {
-        let target = computed[keypath]
-        if (target) {
-          target.set(value)
-          return
-        }
-        const match = matchBest(reversedComputedKeys, keypath)
-        if (match && match.prop) {
-          target = computed[match.name].get()
-          // 如果 target 是基本类型，则忽略此次设值
-          if (!is.primitive(target)) {
-            object.set(target, match.prop, value)
-          }
-          return
-        }
-      }
-      object.set(instance.data, keypath, value)
-
-    }
 
     if (is.string(keypath)) {
       setValue(value, keypath)
     }
     else if (is.object(keypath)) {
       object.each(keypath, setValue)
-    }
-
-    for (let i = 0; i < changes[env.RAW_LENGTH]; i += 3) {
-      emitter.fire(
-        changes[i],
-        [
-          changes[i + 1],
-          changes[i + 2]
-        ]
-      )
     }
 
   }

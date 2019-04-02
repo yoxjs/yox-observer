@@ -3,13 +3,14 @@ import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as logger from 'yox-common/util/logger'
+import Observer from './Observer';
 
 /**
  * 计算属性
  *
  * 可配置 cache、dep、get 等
  */
-export default  class Computed {
+export default class Computed {
 
   static current?: Computed
 
@@ -137,7 +138,7 @@ export default  class Computed {
    *
    * @param dep
    */
-  add(dep: string) {
+  add(dep: string, observer: Observer) {
     const instance = this
     instance.checkFrozen()
     if (!instance.has(dep)) {
