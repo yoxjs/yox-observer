@@ -3,7 +3,7 @@ import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as logger from 'yox-common/util/logger'
-import Observer from './Observer';
+import Observer from './Observer'
 
 /**
  * 计算属性
@@ -66,7 +66,15 @@ export default class Computed {
 
     instance.context = observer.context
 
-    if (deps.length > 0) {
+    instance.callback = function () {
+      const oldValue = instance.value,
+      newValue = instance.get(env.TRUE)
+      if (newValue !== oldValue) {
+        observer.diffSync(keypath, newValue, oldValue)
+      }
+    }
+
+    if (!array.falsy(deps)) {
       array.each(
         deps,
         function (dep) {
@@ -74,15 +82,6 @@ export default class Computed {
         }
       )
       instance.frozen = env.TRUE
-    }
-
-    instance.callback = function () {
-
-      let oldValue = instance.value, newValue = instance.get(env.TRUE)
-      if (newValue !== oldValue) {
-        observer.diffSync(keypath, newValue, oldValue)
-      }
-
     }
 
   }
