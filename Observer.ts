@@ -3,21 +3,15 @@ import * as env from 'yox-common/util/env'
 import * as char from 'yox-common/util/char'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
-import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
-import * as keypathUtil from 'yox-common/util/keypath'
 
 import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
-import Computed from './Computed';
-import isFuzzyKeypath from './function/isFuzzyKeypath';
-import matchFuzzyKeypath from './function/matchFuzzyKeypath';
-import matchBest from './function/matchBest';
-import diffObject from './function/diffObject';
-import diffArray from './function/diffArray';
-import readValue from './function/readValue';
-import diffString from './function/diffString';
+
+import Computed from './Computed'
+import matchBest from './function/matchBest'
+import diffWatcher from './function/diffWatcher'
 
 const WATCH_CONFIG_IMMEDIATE = 'immediate'
 const WATCH_CONFIG_SYNC = 'sync'
@@ -69,56 +63,6 @@ export default class Observer {
 
   }
 
-  onChange(oldValue, keypath) {
-
-    let instance = this, changes = string.startsWith(keypath, '$')
-      ? (instance.$changes || (instance.$changes = {}))
-      : (instance.changes || (instance.changes = {}))
-
-    if (!object.has(changes, keypath)) {
-      changes[keypath] = oldValue
-    }
-
-    if (!instance.pending) {
-      instance.pending = env.TRUE
-      instance.nextTick(
-        function () {
-          if (instance.pending) {
-
-            let { changes, $changes, asyncEmitter } = instance
-
-            instance.pending =
-              instance.changes =
-              instance.$changes = env.NULL
-
-            let listenerKeys = object.keys(asyncEmitter.listeners)
-
-            let eachChange = function (oldValue, keypath) {
-              let newValue = instance.get(keypath)
-              if (newValue !== oldValue) {
-                let args = [newValue, oldValue, keypath]
-                asyncEmitter.fire(keypath, args)
-                array.each(
-                  listenerKeys,
-                  function (key) {
-                    if (isFuzzyKeypath(key) && matchFuzzyKeypath(keypath, key)) {
-                      asyncEmitter.fire(key, args)
-                    }
-                  }
-                )
-              }
-            }
-
-            $changes && object.each($changes, eachChange)
-            changes && object.each(changes, eachChange)
-
-          }
-        }
-      )
-    }
-
-  }
-
   /**
    * 获取数据
    *
@@ -127,10 +71,6 @@ export default class Observer {
    * @return
    */
   get(keypath: string, defaultValue?: any): any {
-
-    if (!is.string(keypath) || isFuzzyKeypath(keypath)) {
-      return
-    }
 
     const instance = this
 
@@ -180,35 +120,12 @@ export default class Observer {
 
     const instance = this,
 
-    { syncEmitter, asyncEmitter, asyncChanges } = instance,
-
-    // 设值要触发`同步`监听
-    syncKeypaths = object.keys(syncEmitter.listeners),
-
-    // 设值要触发`异步`监听
-    asyncKeypaths = object.keys(asyncEmitter.listeners),
-
-    // 三个元素算作一个整体
-    // 第一个表示监听的 keypath
-    // 第二个表示实际的 keypath
-    // 第三个表示旧值
-    changes = [ ],
-
-    setValue = function (value: any, keypath: string) {
+    setValue = function (newValue: any, keypath: string) {
 
       const oldValue = instance.get(keypath)
-      if (value === oldValue) {
+      if (newValue === oldValue) {
         return
       }
-
-      changes[env.RAW_LENGTH] = 0
-
-      // 在真正设值之前调用，可取到 oldValue
-      addChange(syncKeypaths, keypath, value, oldValue)
-
-      const divider = changes[env.RAW_LENGTH]
-
-      addChange(asyncKeypaths, keypath, value, oldValue)
 
       const { computed, reversedComputedKeys } = instance
 
@@ -216,7 +133,7 @@ export default class Observer {
       if (computed) {
         target = computed[keypath]
         if (target) {
-          target.set(value)
+          target.set(newValue)
         }
         else {
           const match = matchBest(reversedComputedKeys, keypath)
@@ -224,118 +141,17 @@ export default class Observer {
             target = computed[match.name]
             const targetValue = target.get()
             if (is.object(targetValue) || is.array(targetValue)) {
-              object.set(targetValue, match.prop, value)
+              object.set(targetValue, match.prop, newValue)
             }
           }
         }
       }
 
-      // 没命中计算属性，则正常设值
       if (!target) {
-        object.set(instance.data, keypath, value)
+        object.set(instance.data, keypath, newValue)
       }
 
-      // 触发同步监听
-      for (let i = 0, len = changes[env.RAW_LENGTH]; i < len; i += 3) {
-        if (i < divider) {
-          syncEmitter.fire(changes[i])
-        }
-        else {
-          asyncChanges.
-        }
-      }
-
-    },
-
-    addChange = function (watchKeypaths: string[], keypath: string, newValue: any, oldValue: any) {
-
-
-      const fuzzyKeypaths = [],
-
-      // 我们认为 $ 开头的变量是不可递归的
-      // 比如浏览器中常见的 $0 表示当前选中元素
-      // DOM 元素是不能递归的
-      isRecursive = char.codeAt(keypath) !== 36
-
-      // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
-      array.each(
-        watchKeypaths,
-        function (watchKeypath) {
-
-          // 模糊监听，如 users.*.name
-          if (isFuzzyKeypath(watchKeypath)) {
-
-            // 如果当前修改的是 users.0 整个对象
-            // users.0 和 users.*.name 无法匹配
-            // 此时要知道设置 users.0 到底会不会改变 users.*.name 需要靠递归了
-
-            // 如果匹配，则无需递归
-            if (matchFuzzyKeypath(keypath, watchKeypath)) {
-              changes.push(
-                watchKeypath, keypath, oldValue
-              )
-            }
-            else if (isRecursive) {
-              array.push(
-                fuzzyKeypaths,
-                watchKeypath
-              )
-            }
-
-            return
-          }
-
-          // 不是模糊匹配，直接靠前缀匹配
-          // 比如监听的是 users.0.name，此时修改 users.0，则直接读出子属性值，判断是否相等
-          const length = keypathUtil.match(watchKeypath, keypath)
-          if (length >= 0) {
-            const subKeypath = string.slice(watchKeypath, length),
-            subNewValue = readValue(newValue, subKeypath),
-            subOldValue = readValue(oldValue, subKeypath)
-            if (subNewValue !== subOldValue) {
-              changes.push(
-                watchKeypath, watchKeypath, subOldValue
-              )
-            }
-          }
-
-        }
-      )
-
-      // 存在模糊匹配的需求
-      // 必须对数据进行递归
-      // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
-      if (fuzzyKeypaths[env.RAW_LENGTH]) {
-        addFuzzyChange(fuzzyKeypaths, keypath, newValue, oldValue)
-      }
-
-    },
-
-    addFuzzyChange = function (fuzzyKeypaths: string[], keypath: string, newValue: any, oldValue: any) {
-
-      const callback = function (subKeypath: string | number, subNewValue: any, subOldValue: any) {
-
-        if (subNewValue !== subOldValue) {
-
-          array.each(
-            fuzzyKeypaths,
-            function (fuzzyKeypath) {
-              if (matchFuzzyKeypath(keypath, fuzzyKeypath)) {
-                changes.push(
-                  fuzzyKeypath, keypath, oldValue
-                )
-              }
-            }
-          )
-
-          addFuzzyChange(fuzzyKeypaths, keypathUtil.join(keypath, subKeypath), subNewValue, subOldValue)
-        }
-
-      }
-
-      diffString(newValue, oldValue, callback)
-        || diffArray(newValue, oldValue, callback)
-        || diffObject(newValue, oldValue, callback)
+      instance.diffSync(keypath, newValue, oldValue)
 
     }
 
@@ -348,11 +164,96 @@ export default class Observer {
 
   }
 
-  beforeSet() {
+  /**
+   * 根据正在监听的 keypath 对比差异
+   *
+   * @param keypath
+   * @param newValue
+   * @param oldValue
+   */
+  diffSync(keypath: string, newValue: any, oldValue: any) {
+
+    const instance = this,
+
+    { syncEmitter, asyncEmitter, asyncChanges } = instance,
+
+    // 我们认为 $ 开头的变量是不可递归的
+    // 比如浏览器中常见的 $0 表示当前选中元素
+    // DOM 元素是不能递归的
+    isRecursive = char.codeAt(keypath) !== 36
+
+    diffWatcher(
+      keypath, newValue, oldValue,
+      syncEmitter.listeners, isRecursive,
+      function (watchKeypath: string) {
+        syncEmitter.fire(watchKeypath)
+      }
+    )
+
+    /**
+     * 此处有坑，举个例子
+     *
+     * observer.set('a', 1)
+     *
+     * observer.watch('a', function () {})
+     *
+     * 先设值，再监听，因为设值会触发 nextTick fire event，
+     * 但是最新的这个 watcher 并没有发生值的变化
+     *
+     * 因此这里要标记 dirty
+     */
+    diffWatcher(
+      keypath, newValue, oldValue,
+      asyncEmitter.listeners, isRecursive,
+      function (watchKeypath: string, keypath: string, oldValue: any) {
+        asyncChanges.push(watchKeypath, keypath, oldValue)
+
+        if (!instance.pendding) {
+          instance.pendding = env.TRUE
+          instance.nextTick(
+            function () {
+              if (instance.pendding) {
+                instance.pendding = env.NULL
+                instance.diffAsync()
+              }
+            }
+          )
+        }
+      }
+    )
 
   }
 
-  afterSet() {
+  diffAsync() {
+
+    const instance = this,
+
+    { asyncEmitter, asyncChanges, context } = instance,
+
+    filter = function (item: any): boolean {
+      if (item.dirty) {
+        item.dirty = env.NULL
+        return env.TRUE
+      }
+    }
+
+    instance.asyncChanges = []
+
+    for (let i = 0, len = asyncChanges.length, newValue: any, oldValue: any, keypath: string; i < len; i += 3) {
+
+      keypath = asyncChanges[i + 1]
+      oldValue = asyncChanges[i + 2]
+      newValue = instance.get(keypath)
+
+      if (newValue !== oldValue) {
+        asyncEmitter.fire(
+          keypath,
+          [newValue, oldValue, keypath],
+          context,
+          filter
+        )
+      }
+    }
 
   }
 
@@ -365,7 +266,7 @@ export default class Observer {
   addComputed(keypath: string, options: any): Computed | void {
 
     const instance = this,
-    computed = Computed.build(keypath, instance.context, options)
+    computed = Computed.build(keypath, instance, options)
 
     if (computed) {
 
@@ -409,27 +310,21 @@ export default class Observer {
    * @param options.sync 是否同步响应，默认是异步
    * @param options.once 是否监听一次
    */
-  watch(keypath: any, watcher?: any, options?: any) {
+  watch(keypath: string | Object, watcher?: Function | Object, options?: Object) {
 
     const instance = this,
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, func: Function, options: Object) {
+    bind = function (keypath: string, watcher: Function, options: Object) {
 
       const emitter = options[WATCH_CONFIG_SYNC] ? syncEmitter : asyncEmitter
 
-      emitter[options[WATCH_CONFIG_ONCE] ? 'once' : 'on'](
-        keypath,
-        {
-          func,
-          context,
-        }
-      )
+      emitter[options[WATCH_CONFIG_ONCE] ? 'once' : 'on'](keypath, watcher)
 
       if (options[WATCH_CONFIG_IMMEDIATE]) {
         execute(
-          func,
+          watcher,
           context,
           [
             instance.get(keypath),
@@ -442,7 +337,7 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      bind(keypath, watcher, options || env.plain)
+      bind(<string>keypath, <Function>watcher, options || env.plain)
       return
     }
 
@@ -472,20 +367,23 @@ export default class Observer {
   /**
    * 取消监听数据变化
    *
-   * @param {string|Object} keypath
-   * @param {Function} watcher
+   * @param keypath
+   * @param watcher
    */
-  unwatch(keypath: any, watcher?: Function) {
-    const { syncEmitter, asyncEmitter } = this,
-    unbind = function (watcher: Function, keypath: string) {
-      syncEmitter.off(keypath, watcher)
-      asyncEmitter.off(keypath, watcher)
-    }
+  unwatch(keypath: string | Object, watcher?: Function) {
+    const { syncEmitter, asyncEmitter } = this
     if (is.string(keypath)) {
-      unbind(watcher, keypath)
+      syncEmitter.off(<string>keypath, watcher)
+      asyncEmitter.off(<string>keypath, watcher)
     }
     else if (is.object(keypath)) {
-      object.each(keypath, unbind)
+      object.each(
+        keypath,
+        function (watcher: Function, keypath: string) {
+          syncEmitter.off(keypath, watcher)
+          asyncEmitter.off(keypath, watcher)
+        }
+      )
     }
   }
 
@@ -544,7 +442,7 @@ export default class Observer {
    * @param item
    * @param index
    */
-  insert(keypath: string, item: any, index: any): boolean {
+  insert(keypath: string, item: any, index: number | boolean): boolean {
 
     let list = this.get(keypath)
     list = !is.array(list) ? [] : object.copy(list)

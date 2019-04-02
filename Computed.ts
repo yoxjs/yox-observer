@@ -8,7 +8,7 @@ import Observer from './Observer';
 /**
  * 计算属性
  *
- * 可配置 cache、dep、get 等
+ * 可配置 cache、deps、get、set 等
  */
 export default class Computed {
 
@@ -18,10 +18,10 @@ export default class Computed {
    * 对外的构造器，把用户配置的计算属性对象转换成内部对象
    *
    * @param keypath
-   * @param context
+   * @param observer
    * @param options
    */
-  static build(keypath: string, context: any, options: any): Computed | void {
+  static build(keypath: string, observer: any, options: any): Computed | void {
 
     let cache = env.TRUE, deps = [], getter: Function, setter: Function
 
@@ -43,21 +43,28 @@ export default class Computed {
       }
     }
 
-    if (getter || setter) {
-      return new Computed(keypath, cache, deps, getter, setter, context)
+    if (getter) {
+      return new Computed(keypath, cache, deps, observer, getter, setter)
     }
 
   }
 
   value: any
+
   frozen: boolean
+
+  context: any
+
+  callback: Function
 
   private constructor(
     public keypath: string, public cache: boolean, public deps: string[],
-    public getter: Function, public setter: Function, public context: any
+    public observer: Observer, public getter: Function, public setter: Function
   ) {
 
     const instance = this
+
+    instance.context = observer.context
 
     if (deps.length > 0) {
       array.each(
@@ -69,11 +76,11 @@ export default class Computed {
       instance.frozen = env.TRUE
     }
 
-    instance.update = function () {
+    instance.callback = function () {
 
-      let oldValue = instance.value
-      if (instance.get(env.TRUE) !== oldValue) {
-
+      let oldValue = instance.value, newValue = instance.get(env.TRUE)
+      if (newValue !== oldValue) {
+        observer.diffSync(keypath, newValue, oldValue)
       }
 
     }
@@ -138,12 +145,14 @@ export default class Computed {
    *
    * @param dep
    */
-  add(dep: string, observer: Observer) {
+  add(dep: string) {
     const instance = this
     instance.checkFrozen()
     if (!instance.has(dep)) {
       array.push(instance.deps, dep)
-      instance.observer.watch(dep, instance.update, env.FALSE, instance)
+      instance.observer.watch(dep, instance.callback, {
+        sync: env.TRUE
+      })
     }
   }
 
@@ -156,7 +165,7 @@ export default class Computed {
     const instance = this
     instance.checkFrozen()
     if (array.remove(instance.deps, dep) > 0) {
-      instance.observer.unwatch(dep, instance.update)
+      instance.observer.unwatch(dep, instance.callback)
     }
   }
 
