@@ -34,23 +34,26 @@ export default class Observer {
 
   context: any
 
-  syncEmitter = new Emitter()
+  syncEmitter: Emitter
 
-  asyncEmitter = new Emitter()
+  asyncEmitter: Emitter
 
-  asyncChanges = { }
+  asyncChanges: Object
 
   computed: any
 
-  reversedComputedKeys?: string[]
+  reversedComputedKeys: string[] | void
 
   pendding: boolean | void
 
-  constructor(context?: any, computed?: Object, public data = {}) {
+  constructor(public data = {}, computed?: Object, context?: any) {
 
     const instance = this
 
     instance.context = context || instance
+    instance.syncEmitter = new Emitter()
+    instance.asyncEmitter = new Emitter()
+    instance.asyncChanges = {}
 
     if (computed) {
       object.each(
