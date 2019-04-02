@@ -165,6 +165,48 @@ it('unwatch', done => {
 
 })
 
+it('increase', () => {
+
+  let observer = new Observer()
+
+  expect(observer.increase('count')).toBe(1)
+  expect(observer.get('count')).toBe(1)
+
+  expect(observer.increase('count', 2)).toBe(3)
+  expect(observer.get('count')).toBe(3)
+
+  expect(observer.increase('count', 2, 3)).toBe(undefined)
+  expect(observer.get('count')).toBe(3)
+
+})
+
+it('decrease', () => {
+
+  let observer = new Observer()
+
+  expect(observer.decrease('count')).toBe(-1)
+  expect(observer.get('count')).toBe(-1)
+
+  expect(observer.decrease('count', 2)).toBe(-3)
+  expect(observer.get('count')).toBe(-3)
+
+  expect(observer.decrease('count', 2, -3)).toBe(undefined)
+  expect(observer.get('count')).toBe(-3)
+
+})
+
+it('toggle', () => {
+
+  let observer = new Observer()
+
+  expect(observer.toggle('disabled')).toBe(true)
+  expect(observer.get('disabled')).toBe(true)
+
+  expect(observer.toggle('disabled')).toBe(false)
+  expect(observer.get('disabled')).toBe(false)
+
+})
+
 it('simple undo', done => {
 
   let observer = new Observer({

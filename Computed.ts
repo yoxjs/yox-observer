@@ -3,7 +3,6 @@ import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
-import * as logger from 'yox-common/util/logger'
 
 // TS 循环依赖居然不报错...
 import Observer from './Observer'
@@ -79,9 +78,7 @@ export default class Computed {
       }
     }
 
-    instance.frozen = !array.falsy(deps)
-
-    if (instance.frozen) {
+    if (instance.frozen = !array.falsy(deps)) {
       array.each(
         deps,
         function (dep) {
@@ -154,7 +151,6 @@ export default class Computed {
    */
   add(dep: string) {
     const instance = this
-    instance.checkFrozen()
     if (!instance.has(dep)) {
       array.push(instance.deps, dep)
       instance.observer.watch(dep, instance.callback, watchOptions)
@@ -168,7 +164,6 @@ export default class Computed {
    */
   remove(dep: string) {
     const instance = this
-    instance.checkFrozen()
     if (array.remove(instance.deps, dep) > 0) {
       instance.observer.unwatch(dep, instance.callback)
     }
@@ -179,7 +174,6 @@ export default class Computed {
    */
   clear() {
     const instance = this
-    instance.checkFrozen()
     array.each(
       instance.deps,
       function (dep) {
@@ -187,12 +181,6 @@ export default class Computed {
       },
       env.TRUE
     )
-  }
-
-  checkFrozen() {
-    if (this.frozen) {
-      logger.fatal('the computed object is frozen, you can not modify deps')
-    }
   }
 
 }
