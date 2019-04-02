@@ -26,7 +26,13 @@ import diffWatcher from './function/diffWatcher'
  */
 export default class Observer {
 
+  data: Object
+
   context: any
+
+  computed: any
+
+  reversedComputedKeys: string[] | void
 
   syncEmitter: Emitter
 
@@ -34,16 +40,13 @@ export default class Observer {
 
   asyncChanges: Object
 
-  computed: any
-
-  reversedComputedKeys: string[] | void
-
   ticking: boolean | void
 
-  constructor(public data = {}, computed?: Object, context?: any) {
+  constructor(data?: Object, computed?: Object, context?: any) {
 
     const instance = this
 
+    instance.data = data || {}
     instance.context = context || instance
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
@@ -52,8 +55,8 @@ export default class Observer {
     if (computed) {
       object.each(
         computed,
-        function (item, keypath) {
-          instance.addComputed(keypath, item)
+        function (options, keypath) {
+          instance.addComputed(keypath, options)
         }
       )
     }

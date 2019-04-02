@@ -53,22 +53,39 @@ export default class Computed {
 
   }
 
+  keypath: string
+
   value: any
+
+  deps: string[]
+
+  cache: boolean
 
   frozen: boolean
 
   context: any
 
+  observer: Observer
+
+  getter: Function
+  setter: Function | void
   callback: Function
 
   private constructor(
-    public keypath: string, public cache: boolean, public deps: string[],
-    public observer: Observer, public getter: Function, public setter: Function | void
+    keypath: string, cache: boolean, deps: string[],
+    observer: Observer, getter: Function, setter: Function | void
   ) {
 
     const instance = this
 
+    instance.keypath = keypath
+    instance.cache = cache
+    instance.deps = []
+
     instance.context = observer.context
+    instance.observer = observer
+    instance.getter = getter
+    instance.setter = setter
 
     instance.callback = function () {
       const oldValue = instance.value,
@@ -82,7 +99,7 @@ export default class Computed {
       array.each(
         deps,
         function (dep) {
-          observer.watch(dep, instance.callback, watchOptions)
+          instance.add(dep)
         }
       )
     }
