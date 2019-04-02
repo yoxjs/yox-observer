@@ -38,7 +38,7 @@ export default class Observer {
 
   asyncEmitter = new Emitter()
 
-  asyncChanges = [ ]
+  asyncChanges = { }
 
   computed: any
 
@@ -165,7 +165,7 @@ export default class Observer {
   }
 
   /**
-   * 根据正在监听的 keypath 对比差异
+   * 同步调用的 diff，用于触发 syncEmitter，以及唤醒 asyncEmitter
    *
    * @param keypath
    * @param newValue
@@ -177,9 +177,11 @@ export default class Observer {
 
     { syncEmitter, asyncEmitter, asyncChanges } = instance,
 
-    // 我们认为 $ 开头的变量是不可递归的
-    // 比如浏览器中常见的 $0 表示当前选中元素
-    // DOM 元素是不能递归的
+    /**
+     * 我们认为 $ 开头的变量是不可递归的
+     * 比如浏览器中常见的 $0 表示当前选中元素
+     * DOM 元素是不能递归的
+     */
     isRecursive = char.codeAt(keypath) !== 36
 
     diffWatcher(
@@ -193,20 +195,38 @@ export default class Observer {
     /**
      * 此处有坑，举个例子
      *
+     * observer.watch('a', function () {})
+     *
      * observer.set('a', 1)
      *
      * observer.watch('a', function () {})
      *
-     * 先设值，再监听，因为设值会触发 nextTick fire event，
-     * 但是最新的这个 watcher 并没有发生值的变化
-     *
-     * 因此这里要标记 dirty
+     * 这里，第一个 watcher 应该触发，但第二个不应该，因为它绑定监听时，值已经是最新的了
      */
+
     diffWatcher(
       keypath, newValue, oldValue,
       asyncEmitter.listeners, isRecursive,
-      function (watchKeypath: string, keypath: string, oldValue: any) {
-        asyncChanges.push(watchKeypath, keypath, oldValue)
+      function (watching: string, keypath: string, value: any) {
+
+        array.each(
+          asyncEmitter.listeners[watching],
+          function (item) {
+            item.dirty = env.TRUE
+          }
+        )
+
+        if (!asyncChanges[keypath]) {
+          asyncChanges[keypath] = {
+            value,
+            watches: []
+          }
+        }
+
+        let { watches } = asyncChanges[keypath]
+        if (!array.has(watches, watching)) {
+          array.push(watches, watching)
+        }
 
         if (!instance.pendding) {
           instance.pendding = env.TRUE
@@ -224,36 +244,39 @@ export default class Observer {
 
   }
 
+  /**
+   * 异步触发的 diff
+   */
   diffAsync() {
 
     const instance = this,
 
     { asyncEmitter, asyncChanges, context } = instance,
 
-    filter = function (item: any): boolean {
+    filter = function (item: any, args: any): boolean {
       if (item.dirty) {
         item.dirty = env.NULL
-        return env.TRUE
+        return args[0] !== args[1]
       }
     }
 
-    instance.asyncChanges = []
+    instance.asyncChanges = {}
 
-    for (let i = 0, len = asyncChanges.length, newValue: any, oldValue: any, keypath: string; i < len; i += 3) {
+    object.each(
+      asyncChanges,
+      function (item, keypath) {
 
-      keypath = asyncChanges[i + 1]
-      oldValue = asyncChanges[i + 2]
-      newValue = instance.get(keypath)
+        let args = [instance.get(keypath), item.value, keypath]
 
-      if (newValue !== oldValue) {
-        asyncEmitter.fire(
-          keypath,
-          [newValue, oldValue, keypath],
-          context,
-          filter
+        array.each(
+          item.watches,
+          function (watching) {
+            asyncEmitter.fire(watching, args, context, filter)
+          }
         )
+
       }
-    }
+    )
 
   }
 
