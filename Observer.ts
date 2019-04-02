@@ -192,7 +192,6 @@ export default class Observer {
     // 第一个表示监听的 keypath
     // 第二个表示旧值
     // 第三个表示实际的 keypath
-    syncChanges = [],
     asyncChanges = [],
 
     setValue = function (value: any, keypath: string) {
@@ -202,34 +201,45 @@ export default class Observer {
         return
       }
 
+      const syncChanges = []
+
       // 在真正设值之前调用，可取到 oldValue
       addChange(syncKeypaths, syncChanges, keypath, value, oldValue)
       addChange(asyncKeypaths, asyncChanges, keypath, value, oldValue)
 
       const { computed, reversedComputedKeys } = instance
+
+      let target: Computed
       if (computed) {
-        let target = computed[keypath]
+        target = computed[keypath]
         if (target) {
           target.set(value)
-          return
         }
-        const match = matchBest(reversedComputedKeys, keypath)
-        if (match && match.prop) {
-          target = computed[match.name].get()
-          // 如果 target 是基本类型，则忽略此次设值
-          if (!is.primitive(target)) {
-            object.set(target, match.prop, value)
+        else {
+          const match = matchBest(reversedComputedKeys, keypath)
+          if (match && match.prop) {
+            target = computed[match.name]
+            const targetValue = target.get()
+            if (is.object(targetValue) || is.array(targetValue)) {
+              object.set(targetValue, match.prop, value)
+            }
           }
-          return
         }
       }
-      object.set(instance.data, keypath, value)
+
+      // 没命中计算属性，则正常设值
+      if (!target) {
+        object.set(instance.data, keypath, value)
+      }
+
+      // 触发同步监听
+
 
     },
 
-    addChange = function (watchKeypaths: string[], changes: string[], keypath: string, newValue: any, oldValue: any) {
+    addChange = function (watchKeypaths: string[], keypath: string, newValue: any, oldValue: any) {
 
-      const fuzzyKeypaths = []
+      const fuzzyKeypaths = [], changes = []
 
       // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
       array.each(
@@ -246,11 +256,14 @@ export default class Observer {
             // 如果匹配，则无需递归
             if (matchFuzzyKeypath(keypath, watchKeypath)) {
               changes.push(
-                watchKeypath, oldValue, keypath
+                watchKeypath, keypath, oldValue
               )
             }
             else {
-              array.push(fuzzyKeypaths, watchKeypath)
+              array.push(
+                fuzzyKeypaths,
+                watchKeypath
+              )
             }
 
             return
@@ -265,7 +278,7 @@ export default class Observer {
             subOldValue = readValue(oldValue, subKeypath)
             if (subNewValue !== subOldValue) {
               changes.push(
-                watchKeypath, subOldValue, watchKeypath
+                watchKeypath, watchKeypath, subOldValue
               )
             }
           }
@@ -277,12 +290,12 @@ export default class Observer {
       // 必须对数据进行递归
       // 性能确实会慢一些，但是很好用啊，几乎可以监听所有的数据
       if (fuzzyKeypaths.length) {
-        addFuzzyChange(fuzzyKeypaths, newValue, oldValue, keypath)
+        addFuzzyChange(fuzzyKeypaths, changes, keypath, newValue, oldValue)
       }
 
     },
 
-    addFuzzyChange = function (fuzzyKeypaths: string[], newValue: any, oldValue: any, keypath: string) {
+    addFuzzyChange = function (fuzzyKeypaths: string[], changes: any[], keypath: string, newValue: any, oldValue: any) {
       if (newValue !== oldValue) {
 
         // fuzzyKeypaths 全是模糊的 keypath

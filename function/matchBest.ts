@@ -9,7 +9,7 @@ import * as keypathUtil from 'yox-common/util/keypath'
  * @param sorted 经过排序的 keypath 数组
  * @param keypath
  */
-export default function matchBest(sorted: string[], keypath: string): any {
+export default function (sorted: string[], keypath: string): any {
 
   let result: any
 

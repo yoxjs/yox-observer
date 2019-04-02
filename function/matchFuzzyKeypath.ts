@@ -6,7 +6,7 @@ const patternCache = {}
  * @param keypath
  * @param pattern
  */
-export default function matchKeypath(keypath: string, pattern: string): boolean {
+export default function (keypath: string, pattern: string): boolean {
   let cache = patternCache[pattern]
   if (!cache) {
     cache = pattern

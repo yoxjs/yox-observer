@@ -5,6 +5,6 @@ import * as string from 'yox-common/util/string'
  *
  * @param keypath
  */
-export default function isFuzzyKeypath(keypath: string): boolean {
+export default function (keypath: string): boolean {
   return string.has(keypath, '*')
 }
