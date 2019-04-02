@@ -1,4 +1,3 @@
-
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as char from 'yox-common/util/char'
@@ -20,14 +19,30 @@ import diffArray from './function/diffArray';
 import readValue from './function/readValue';
 import diffString from './function/diffString';
 
+const WATCH_CONFIG_IMMEDIATE = 'immediate'
+const WATCH_CONFIG_SYNC = 'sync'
+const WATCH_CONFIG_ONCE = 'once'
 
+const watchConfigList = [WATCH_CONFIG_IMMEDIATE, WATCH_CONFIG_SYNC, WATCH_CONFIG_ONCE]
+
+/**
+ * 观察者有两种观察模式：
+ *
+ * 1. 同步监听
+ * 2. 异步监听
+ *
+ * 对于`计算属性`这种需要实时变化的对象，即它的依赖变了，它需要立即跟着变，否则会出现不一致的问题
+ * 这种属于同步监听
+ *
+ * 对于外部调用 observer.watch('keypath', listener)，属于异步监听，它只关心是否变了，而不关心是否是立即触发的
+ */
 export default class Observer {
 
   context: any
 
-  emitter: Emitter
+  syncEmitter = new Emitter()
 
-  asyncEmitter: Emitter
+  asyncEmitter = new Emitter()
 
   computed: any
 
@@ -37,11 +52,9 @@ export default class Observer {
 
   constructor(context?: any, computed = env.NULL, public data = {}) {
 
-    let instance = this
+    const instance = this
 
     instance.context = context || instance
-    instance.emitter = new Emitter()
-    instance.asyncEmitter = new Emitter()
 
     if (computed) {
       object.each(
@@ -165,10 +178,10 @@ export default class Observer {
 
     const instance = this
 
-    const { emitter } = instance
+    const { syncEmitter } = instance
 
-    // 同步监听的 keypath
-    const listenKeypaths = object.keys(emitter.listeners)
+    // 设值要触发`同步`监听
+    const listenKeypaths = object.keys(syncEmitter.listeners)
 
     // 三个元素算作一个整体
     // 第一个表示监听的 keypath
@@ -273,6 +286,9 @@ export default class Observer {
         return
       }
 
+      // 在真正设值之前调用，可取到 oldValue
+      // 比如 set('user.name', 'musicode')
+      // 此时有一个计算属性依赖了 user.name，此时就要更新计算属性的值
       addChange(value, oldValue, keypath)
 
       const { computed, reversedComputedKeys } = instance
@@ -308,8 +324,7 @@ export default class Observer {
         changes[i],
         [
           changes[i + 1],
-          changes[i + 2],
-          addChange
+          changes[i + 2]
         ]
       )
     }
@@ -324,8 +339,8 @@ export default class Observer {
    */
   addComputed(keypath: string, options: any): Computed | void {
 
-    const instance = this
-    const computed = Computed.build(keypath, instance.context, options)
+    const instance = this,
+    computed = Computed.build(keypath, instance.context, options)
 
     if (computed) {
 
@@ -334,7 +349,6 @@ export default class Observer {
       }
 
       instance.computed[keypath] = computed
-
       instance.reversedComputedKeys = object.sort(instance.computed, env.TRUE)
 
       return computed
@@ -344,50 +358,51 @@ export default class Observer {
   }
 
   /**
+   * 移除计算属性
+   *
+   * @param keypath
+   */
+  removeComputed(keypath: string) {
+
+    const instance = this,
+    { computed } = instance
+
+    if (computed && object.has(computed, keypath)) {
+      delete computed[keypath]
+      instance.reversedComputedKeys = object.sort(computed, env.TRUE)
+    }
+
+  }
+
+  /**
    * 监听数据变化
    *
    * @param keypath
    * @param watcher
-   * @param sync
+   * @param options
+   * @param options.immediate 是否立即触发一次
+   * @param options.sync 是否同步响应，默认是异步
+   * @param options.once 是否监听一次
    */
-  watch(keypath: string | Object, watcher: Function | boolean, sync = false, computed = env.NULL) {
+  watch(keypath: any, watcher?: any, options?: any) {
 
-    const instance = this
+    const instance = this,
 
-    const watch = function (instance, keypath, func, sync, computed) {
+    { context, syncEmitter, asyncEmitter } = instance,
 
-      let { context } = instance
+    bind = function (keypath: string, func: Function, options: Object) {
 
-      // 同步回调
-      let syncFunc
+      const emitter = options[WATCH_CONFIG_SYNC] ? syncEmitter : asyncEmitter
 
-      if (!computed) {
-        // 不用直接引用 instance.onChange
-        // 避免 onChange 被多处引用，解绑会出问题
-        syncFunc = function (oldValue, keypath) {
-          instance.onChange(oldValue, keypath)
-        }
-        func.link = syncFunc
-
-        // 设置异步回调
-        instance.asyncEmitter[action](
-          keypath,
-          {
-            func,
-            context,
-          }
-        )
-      }
-
-      instance.emitter[action](
+      emitter[options[WATCH_CONFIG_ONCE] ? 'once' : 'on'](
         keypath,
         {
-          func: syncFunc || func,
-          context: computed || instance,
+          func,
+          context,
         }
       )
 
-      if (sync) {
+      if (options[WATCH_CONFIG_IMMEDIATE]) {
         execute(
           func,
           context,
@@ -402,38 +417,30 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      watch(instance, keypath, watcher, sync, computed)
+      bind(keypath, watcher, options || env.plain)
+      return
     }
-    else {
-      if (watcher === env.TRUE) {
-        computed = sync
-        sync = watcher
-      }
-      object.each(
-        keypath,
-        function (value, keypath) {
-          let itemWatcher = value, itemSync = sync
-          if (is.object(value)) {
-            itemWatcher = value.watcher
-            if (is.boolean(value.sync)) {
-              itemSync = value.sync
+
+    const globalOptions = watcher || env.plain
+
+    object.each(
+      keypath,
+      function (value, keypath) {
+        let watcher = value, options: any = object.extend({}, globalOptions)
+        if (is.object(value)) {
+          watcher = value.watcher
+          array.each(
+            watchConfigList,
+            function (field) {
+              if (is.boolean(value[field])) {
+                options[field] = value[field]
+              }
             }
-          }
-          watch(instance, keypath, itemWatcher, itemSync, computed)
+          )
         }
-      )
-    }
-
-  }
-
-  /**
-   * 监听数据变化
-   *
-   * @param keypath
-   * @param  watcher
-   * @param sync
-   */
-  watchOnce(keypath: string | Object, watcher: Function | boolean, sync = false, computed = env.NULL) {
+        bind(keypath, watcher, options)
+      }
+    )
 
   }
 
@@ -443,17 +450,17 @@ export default class Observer {
    * @param {string|Object} keypath
    * @param {Function} watcher
    */
-  unwatch(keypath: any, watcher: Function) {
-    let { emitter, asyncEmitter } = this
-    let off = function (watcher: Function, keypath: string) {
-      emitter.off(keypath, watcher.link || watcher)
+  unwatch(keypath: any, watcher?: Function) {
+    const { syncEmitter, asyncEmitter } = this,
+    unbind = function (watcher: Function, keypath: string) {
+      syncEmitter.off(keypath, watcher)
       asyncEmitter.off(keypath, watcher)
     }
     if (is.string(keypath)) {
-      off(watcher, keypath)
+      unbind(watcher, keypath)
     }
     else if (is.object(keypath)) {
-      object.each(keypath, off)
+      object.each(keypath, unbind)
     }
   }
 
@@ -497,7 +504,7 @@ export default class Observer {
    * @param step 步进值，默认是 1
    * @param min 可以递减到的最小值，默认不限制
    */
-  decrease(keypath: string, step = 1, min: number): number | void {
+  decrease(keypath: string, step = 1, min?: number): number | void {
     const value = toNumber(this.get(keypath), 0) - step
     if (!is.numeric(min) || value >= min) {
       this.set(keypath, value)
@@ -528,7 +535,7 @@ export default class Observer {
       list.splice(index, 0, item)
     }
     else {
-      return env.FALSE
+      return
     }
 
     this.set(keypath, list)
@@ -554,7 +561,6 @@ export default class Observer {
       this.set(keypath, list)
       return env.TRUE
     }
-    return env.FALSE
   }
 
   /**
@@ -572,21 +578,23 @@ export default class Observer {
         return env.TRUE
       }
     }
-    return env.FALSE
   }
 
-  nextTick(fn: Function) {
-    if (is.func(fn)) {
-      let instance = this
-      nextTask.append(
-        function () {
-          // 确保没销毁
-          if (instance.data) {
-            fn()
-          }
+  /**
+   * 新增异步任务
+   *
+   * @param task
+   */
+  nextTick(task: Function) {
+    const instance = this
+    nextTask.append(
+      function () {
+        // 确保没销毁
+        if (instance.data) {
+          task()
         }
-      )
-    }
+      }
+    )
   }
 
   nextRun() {
@@ -597,7 +605,7 @@ export default class Observer {
    * 销毁
    */
   destroy() {
-    this.emitter.off()
+    this.syncEmitter.off()
     this.asyncEmitter.off()
     object.clear(this)
   }
