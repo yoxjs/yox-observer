@@ -44,9 +44,9 @@ export default class Observer {
 
   reversedComputedKeys?: string[]
 
-  pendding: boolean
+  pendding: boolean | void
 
-  constructor(context?: any, computed = env.NULL, public data = {}) {
+  constructor(context?: any, computed?: Object, public data = {}) {
 
     const instance = this
 
@@ -85,14 +85,17 @@ export default class Observer {
       Computed.current.add(keypath)
     }
 
-    let result: any
+    let result: any, target: Computed | void
 
     const { computed, reversedComputedKeys } = instance
+
     if (computed) {
-      let target = computed[keypath]
+      target = computed[keypath]
       if (target) {
         return target.get()
       }
+    }
+    if (reversedComputedKeys) {
       const match = matchBest(reversedComputedKeys, keypath)
       if (match && match.prop) {
         target = computed[match.name].get()
@@ -127,18 +130,21 @@ export default class Observer {
         return
       }
 
+      let target: Computed | void
+
       const { computed, reversedComputedKeys } = instance
 
-      let target: Computed
       if (computed) {
         target = computed[keypath]
         if (target) {
           target.set(newValue)
         }
-        else {
-          const match = matchBest(reversedComputedKeys, keypath)
-          if (match && match.prop) {
-            target = computed[match.name]
+      }
+      if (reversedComputedKeys) {
+        const match = matchBest(reversedComputedKeys, keypath)
+        if (match && match.prop) {
+          target = computed[match.name]
+          if (target) {
             const targetValue = target.get()
             if (is.object(targetValue) || is.array(targetValue)) {
               object.set(targetValue, match.prop, newValue)
@@ -233,7 +239,7 @@ export default class Observer {
           instance.nextTick(
             function () {
               if (instance.pendding) {
-                instance.pendding = env.NULL
+                instance.pendding = env.UNDEFINED
                 instance.diffAsync()
               }
             }
@@ -253,7 +259,7 @@ export default class Observer {
 
     { asyncEmitter, asyncChanges, context } = instance,
 
-    filter = function (item: any, args: any): boolean {
+    filter = function (item: any, args: any): boolean | void {
       if (item.dirty) {
         item.dirty = env.NULL
         return args[0] !== args[1]
@@ -435,7 +441,7 @@ export default class Observer {
    */
   increase(keypath: string, step = 1, max?: number): number | void {
     const value = toNumber(this.get(keypath), 0) + step
-    if (!is.number(max) || value <= max) {
+    if (!is.number(max) || value <= <number>max) {
       this.set(keypath, value)
       return value
     }
@@ -452,7 +458,7 @@ export default class Observer {
    */
   decrease(keypath: string, step = 1, min?: number): number | void {
     const value = toNumber(this.get(keypath), 0) - step
-    if (!is.numeric(min) || value >= min) {
+    if (!is.number(min) || value >= <number>min) {
       this.set(keypath, value)
       return value
     }
@@ -465,7 +471,7 @@ export default class Observer {
    * @param item
    * @param index
    */
-  insert(keypath: string, item: any, index: number | boolean): boolean {
+  insert(keypath: string, item: any, index: number | boolean): boolean | void {
 
     let list = this.get(keypath)
     list = !is.array(list) ? [] : object.copy(list)
@@ -496,7 +502,7 @@ export default class Observer {
    * @param keypath
    * @param index
    */
-  removeAt(keypath: string, index: number): boolean {
+  removeAt(keypath: string, index: number): boolean | void {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
@@ -515,7 +521,7 @@ export default class Observer {
    * @param keypath
    * @param item
    */
-  remove(keypath: string, item: any): boolean {
+  remove(keypath: string, item: any): boolean | void {
     let list = this.get(keypath)
     if (is.array(list)) {
       list = object.copy(list)

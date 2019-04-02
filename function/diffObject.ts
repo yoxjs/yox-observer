@@ -14,9 +14,9 @@ export default function (
   newValue: any,
   oldValue: any,
   callback: (key: string, newValue: any, oldValue: any) => void
-): boolean {
+): boolean | void {
 
-  let keys: string[]
+  let keys: string[] | void
 
   const newIsObject = is.object(newValue), oldIsObject = is.object(oldValue)
   if (oldIsObject) {

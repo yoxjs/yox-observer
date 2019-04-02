@@ -12,7 +12,7 @@ export default function (
   newValue: any,
   oldValue: any,
   callback: (key: string, newValue: any, oldValue: any) => void
-): boolean {
+): boolean | void {
 
   const newIsString = is.string(newValue), oldIsString = is.string(oldValue)
   if (newIsString || oldIsString) {

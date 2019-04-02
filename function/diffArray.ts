@@ -12,7 +12,7 @@ export default function (
   newValue: any,
   oldValue: any,
   callback: (key: string | number, newValue: any, oldValue: any) => void
-): boolean {
+): boolean | void {
 
   const newIsArray = is.array(newValue), oldIsArray = is.array(oldValue)
   if (newIsArray || oldIsArray) {

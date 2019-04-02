@@ -13,7 +13,7 @@ export default function (
   watcher: Object, isRecursive: boolean, callback: (watchKeypath: string, keypath: string, oldValue: any) => void
 ) {
 
-  let fuzzyKeypaths: any[]
+  let fuzzyKeypaths: any[] | void
 
   // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
   object.each(

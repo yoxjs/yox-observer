@@ -23,7 +23,7 @@ export default class Computed {
    */
   static build(keypath: string, observer: any, options: any): Computed | void {
 
-    let cache = env.TRUE, deps = [], getter: Function, setter: Function
+    let cache = env.TRUE, deps = [], getter: Function | void, setter: Function | void
 
     if (is.func(options)) {
       getter = options
@@ -59,7 +59,7 @@ export default class Computed {
 
   private constructor(
     public keypath: string, public cache: boolean, public deps: string[],
-    public observer: Observer, public getter: Function, public setter: Function
+    public observer: Observer, public getter: Function, public setter: Function | void
   ) {
 
     const instance = this
@@ -124,9 +124,9 @@ export default class Computed {
   }
 
   set(value: any) {
-    const instance = this
-    if (instance.setter) {
-      instance.setter.call(instance.context, value)
+    const { setter, context } = this
+    if (setter) {
+      setter.call(context, value)
     }
   }
 
@@ -135,7 +135,7 @@ export default class Computed {
    *
    * @param dep
    */
-  has(dep: string) {
+  has(dep: string): boolean {
     return array.has(this.deps, dep)
   }
 
