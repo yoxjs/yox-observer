@@ -18,7 +18,7 @@ export default function (
   if (newIsArray || oldIsArray) {
 
     const newLength = newIsArray ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
-      oldLength = oldIsArray ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
+    oldLength = oldIsArray ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
 
     callback(
       env.RAW_LENGTH,

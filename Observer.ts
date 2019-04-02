@@ -38,7 +38,7 @@ export default class Observer {
 
   asyncEmitter: Emitter
 
-  asyncChanges: Object
+  changes: Object
 
   ticking: boolean | void
 
@@ -50,7 +50,7 @@ export default class Observer {
     instance.context = context || instance
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
-    instance.asyncChanges = {}
+    instance.changes = {}
 
     if (computed) {
       object.each(
@@ -181,7 +181,7 @@ export default class Observer {
 
     const instance = this,
 
-    { syncEmitter, asyncEmitter, asyncChanges } = instance,
+    { syncEmitter, asyncEmitter, changes } = instance,
 
     /**
      * 我们认为 $ 开头的变量是不可递归的
@@ -222,7 +222,7 @@ export default class Observer {
           }
         )
 
-        const { list } = asyncChanges[keypath] || (asyncChanges[keypath] = { value, list: [] })
+        const { list } = changes[keypath] || (changes[keypath] = { value, list: [] })
         if (!array.has(list, watchKeypath)) {
           array.push(list, watchKeypath)
         }
@@ -250,7 +250,7 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, asyncChanges, context } = instance,
+    { asyncEmitter, changes, context } = instance,
 
     filter = function (item: any, args: any): boolean | void {
       if (item.dirty > 0) {
@@ -266,10 +266,10 @@ export default class Observer {
       }
     }
 
-    instance.asyncChanges = {}
+    instance.changes = {}
 
     object.each(
-      asyncChanges,
+      changes,
       function (item, keypath) {
 
         const args = [instance.get(keypath), item.value, keypath]
