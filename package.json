@@ -25,7 +25,7 @@
     "@babel/core": "^7.4.0",
     "@babel/preset-env": "^7.4.2",
     "@babel/preset-typescript": "^7.3.3",
-    "babel-jest": "^24.5.0",
+    "babel-jest": "^24.6.0",
     "jest": "^24.5.0",
     "yox-common": "^0.17.2"
   }

@@ -13,12 +13,6 @@ import Computed from './Computed'
 import matchBest from './function/matchBest'
 import diffWatcher from './function/diffWatcher'
 
-const WATCH_CONFIG_IMMEDIATE = 'immediate'
-const WATCH_CONFIG_SYNC = 'sync'
-const WATCH_CONFIG_ONCE = 'once'
-
-const watchConfigList = [WATCH_CONFIG_IMMEDIATE, WATCH_CONFIG_SYNC, WATCH_CONFIG_ONCE]
-
 /**
  * 观察者有两种观察模式：
  *
@@ -44,7 +38,7 @@ export default class Observer {
 
   reversedComputedKeys: string[] | void
 
-  pendding: boolean | void
+  ticking: boolean | void
 
   constructor(public data = {}, computed?: Object, context?: any) {
 
@@ -75,11 +69,13 @@ export default class Observer {
    */
   get(keypath: string, defaultValue?: any): any {
 
-    const instance = this
+    const instance = this,
+
+    { data, computed, reversedComputedKeys } = instance
 
     // 传入 '' 获取整个 data
     if (keypath === char.CHAR_BLANK) {
-      return instance.data
+      return data
     }
 
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
@@ -89,8 +85,6 @@ export default class Observer {
     }
 
     let result: any, target: Computed | void
-
-    const { computed, reversedComputedKeys } = instance
 
     if (computed) {
       target = computed[keypath]
@@ -109,7 +103,7 @@ export default class Observer {
     }
 
     if (!result) {
-      result = object.get(instance.data, keypath)
+      result = object.get(data, keypath)
     }
 
     return result ? result.value : defaultValue
@@ -126,6 +120,8 @@ export default class Observer {
 
     const instance = this,
 
+    { data, computed, reversedComputedKeys } = instance,
+
     setValue = function (newValue: any, keypath: string) {
 
       const oldValue = instance.get(keypath)
@@ -134,8 +130,6 @@ export default class Observer {
       }
 
       let target: Computed | void
-
-      const { computed, reversedComputedKeys } = instance
 
       if (computed) {
         target = computed[keypath]
@@ -157,7 +151,7 @@ export default class Observer {
       }
 
       if (!target) {
-        object.set(instance.data, keypath, newValue)
+        object.set(data, keypath, newValue)
       }
 
       instance.diffSync(keypath, newValue, oldValue)
@@ -216,33 +210,26 @@ export default class Observer {
     diffWatcher(
       keypath, newValue, oldValue,
       asyncEmitter.listeners, isRecursive,
-      function (watching: string, keypath: string, value: any) {
+      function (watchKeypath: string, keypath: string, value: any) {
 
         array.each(
-          asyncEmitter.listeners[watching],
+          asyncEmitter.listeners[watchKeypath],
           function (item) {
-            item.dirty = env.TRUE
+            item.dirty++
           }
         )
 
-        if (!asyncChanges[keypath]) {
-          asyncChanges[keypath] = {
-            value,
-            watches: []
-          }
+        const { list } = asyncChanges[keypath] || (asyncChanges[keypath] = { value, list: [] })
+        if (!array.has(list, watchKeypath)) {
+          array.push(list, watchKeypath)
         }
 
-        let { watches } = asyncChanges[keypath]
-        if (!array.has(watches, watching)) {
-          array.push(watches, watching)
-        }
-
-        if (!instance.pendding) {
-          instance.pendding = env.TRUE
+        if (!instance.ticking) {
+          instance.ticking = env.TRUE
           instance.nextTick(
             function () {
-              if (instance.pendding) {
-                instance.pendding = env.UNDEFINED
+              if (instance.ticking) {
+                instance.ticking = env.UNDEFINED
                 instance.diffAsync()
               }
             }
@@ -263,9 +250,16 @@ export default class Observer {
     { asyncEmitter, asyncChanges, context } = instance,
 
     filter = function (item: any, args: any): boolean | void {
-      if (item.dirty) {
-        item.dirty = env.NULL
+      if (item.dirty > 0) {
+
+        // 采用计数器的原因是，同一个 item 可能执行多次
+        // 比如监听 user.*，如果同批次修改了 user.name 和 user.age
+        // 这个监听器会调用多次，如果第一次执行就把 dirty 干掉了，第二次就无法执行了
+
+        item.dirty--
+
         return args[0] !== args[1]
+
       }
     }
 
@@ -275,12 +269,15 @@ export default class Observer {
       asyncChanges,
       function (item, keypath) {
 
-        let args = [instance.get(keypath), item.value, keypath]
+        const args = [instance.get(keypath), item.value, keypath]
+
+        // 不能在这判断新旧值是否相同，相同就不 fire
+        // 因为前面标记了 dirty，在这中断会导致 dirty 无法清除
 
         array.each(
-          item.watches,
-          function (watching) {
-            asyncEmitter.fire(watching, args, context, filter)
+          item.list,
+          function (watchKeypath) {
+            asyncEmitter.fire(watchKeypath, args, context, filter)
           }
         )
 
@@ -348,13 +345,19 @@ export default class Observer {
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, watcher: Function, options: Object) {
+    bind = function (keypath: string, watcher: Function, options: any) {
 
-      const emitter = options[WATCH_CONFIG_SYNC] ? syncEmitter : asyncEmitter
+      const emitter = options.sync ? syncEmitter : asyncEmitter
 
-      emitter[options[WATCH_CONFIG_ONCE] ? 'once' : 'on'](keypath, watcher)
+      emitter[options.once ? 'once' : 'on'](
+        keypath,
+        {
+          func: watcher,
+          dirty: 0,
+        }
+      )
 
-      if (options[WATCH_CONFIG_IMMEDIATE]) {
+      if (options.immediate) {
         execute(
           watcher,
           context,
@@ -369,7 +372,7 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      bind(<string>keypath, <Function>watcher, options || env.plain)
+      bind(keypath as string, watcher as Function, options || env.plain)
       return
     }
 
@@ -382,7 +385,7 @@ export default class Observer {
         if (is.object(value)) {
           watcher = value.watcher
           array.each(
-            watchConfigList,
+            ['immediate', 'sync', 'once'],
             function (field) {
               if (is.boolean(value[field])) {
                 options[field] = value[field]
@@ -405,8 +408,8 @@ export default class Observer {
   unwatch(keypath: string | Object, watcher?: Function) {
     const { syncEmitter, asyncEmitter } = this
     if (is.string(keypath)) {
-      syncEmitter.off(<string>keypath, watcher)
-      asyncEmitter.off(<string>keypath, watcher)
+      syncEmitter.off(keypath as string, watcher)
+      asyncEmitter.off(keypath as string, watcher)
     }
     else if (is.object(keypath)) {
       object.each(
@@ -444,7 +447,7 @@ export default class Observer {
    */
   increase(keypath: string, step = 1, max?: number): number | void {
     const value = toNumber(this.get(keypath), 0) + step
-    if (!is.number(max) || value <= <number>max) {
+    if (!is.number(max) || value <= (max as number)) {
       this.set(keypath, value)
       return value
     }
@@ -461,7 +464,7 @@ export default class Observer {
    */
   decrease(keypath: string, step = 1, min?: number): number | void {
     const value = toNumber(this.get(keypath), 0) - step
-    if (!is.number(min) || value >= <number>min) {
+    if (!is.number(min) || value >= (min as number)) {
       this.set(keypath, value)
       return value
     }

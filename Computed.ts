@@ -2,8 +2,13 @@ import execute from 'yox-common/function/execute'
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
+import * as object from 'yox-common/util/object'
 import * as logger from 'yox-common/util/logger'
+
+// TS 循环依赖居然不报错...
 import Observer from './Observer'
+
+const watchOptions = { sync: env.TRUE }
 
 /**
  * 计算属性
@@ -74,14 +79,15 @@ export default class Computed {
       }
     }
 
-    if (!array.falsy(deps)) {
+    instance.frozen = !array.falsy(deps)
+
+    if (instance.frozen) {
       array.each(
         deps,
         function (dep) {
-          instance.add(dep)
+          observer.watch(dep, instance.callback, watchOptions)
         }
       )
-      instance.frozen = env.TRUE
     }
 
   }
@@ -93,8 +99,9 @@ export default class Computed {
    */
   get(force = false): any {
 
-    const instance = this
-    const { getter, context } = instance
+    const instance = this,
+
+    { getter, context } = instance
 
     // 禁用缓存
     if (!instance.cache) {
@@ -102,7 +109,7 @@ export default class Computed {
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
-    else if (force) {
+    else if (force || !object.has(instance, 'value')) {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.frozen) {
@@ -113,13 +120,14 @@ export default class Computed {
         instance.clear()
 
         // 开始收集新的依赖
-        let lastComputed = Computed.current
+        const lastComputed = Computed.current
         Computed.current = instance
         instance.value = execute(getter, context)
         Computed.current = lastComputed
       }
 
     }
+
     return instance.value
   }
 
@@ -149,9 +157,7 @@ export default class Computed {
     instance.checkFrozen()
     if (!instance.has(dep)) {
       array.push(instance.deps, dep)
-      instance.observer.watch(dep, instance.callback, {
-        sync: env.TRUE
-      })
+      instance.observer.watch(dep, instance.callback, watchOptions)
     }
   }
 

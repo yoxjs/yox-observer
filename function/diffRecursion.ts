@@ -16,18 +16,20 @@ export default function diffRecursion(
 
     if (subNewValue !== subOldValue) {
 
+      const newKeypath = keypathUtil.join(keypath, subKeypath)
+
       array.each(
         watchFuzzyKeypaths,
         function (fuzzyKeypath) {
-          if (matchFuzzyKeypath(keypath, fuzzyKeypath)) {
+          if (matchFuzzyKeypath(newKeypath, fuzzyKeypath)) {
             callback(
-              fuzzyKeypath, keypath, oldValue
+              fuzzyKeypath, newKeypath, subOldValue
             )
           }
         }
       )
 
-      diffRecursion(keypathUtil.join(keypath, subKeypath), subNewValue, subOldValue, watchFuzzyKeypaths, callback)
+      diffRecursion(newKeypath, subNewValue, subOldValue, watchFuzzyKeypaths, callback)
 
     }
 
