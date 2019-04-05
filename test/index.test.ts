@@ -272,35 +272,53 @@ it('complex undo', done => {
 
 it('change computed data', done => {
 
+  let call1 = 0, call2 = 0
   let observer = new Observer(
     {
       a: 1,
       b: 2,
     },
     {
-      sum: function () {
+      sum1: function () {
+        call1++
         return this.get('a') + this.get('b')
+      },
+      sum2: {
+        sync: false,
+        get: function () {
+          call2++
+          return this.get('a') + this.get('b')
+        }
       }
     }
   )
 
-  expect(observer.get('sum')).toBe(3)
+  expect(observer.get('sum1')).toBe(3)
+  expect(observer.get('sum2')).toBe(3)
 
-  let sum = 0, count = 0
-  observer.watch('sum', function (value) {
+  let sum1 = 0, count = 0
+  observer.watch('sum1', function (value) {
     count++
-    sum = value
+    sum1 = value
   })
+
+  expect(call1).toBe(1)
+  expect(call2).toBe(1)
 
   observer.set('a', 2)
   observer.set('b', 3)
 
-  expect(sum).toBe(0)
+  expect(call1).toBe(3)
+  expect(call2).toBe(1)
+
+  expect(sum1).toBe(0)
   expect(count).toBe(0)
-  expect(observer.get('sum')).toBe(5)
+  expect(observer.get('sum1')).toBe(5)
 
   observer.nextTick(function () {
-    expect(sum).toBe(5)
+    expect(call1).toBe(3)
+    expect(call2).toBe(2)
+    expect(sum1).toBe(5)
     expect(count).toBe(1)
     done()
   })

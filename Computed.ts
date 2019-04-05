@@ -7,7 +7,9 @@ import * as object from 'yox-common/util/object'
 // TS 循环依赖居然不报错...
 import Observer from './Observer'
 
-const watchOptions = { sync: env.TRUE }
+const syncWatchOptions = { sync: env.TRUE }
+
+const asyncWatchOptions = { sync: env.FALSE }
 
 /**
  * 计算属性
@@ -27,7 +29,8 @@ export default class Computed {
    */
   static build(keypath: string, observer: any, options: any): Computed | void {
 
-    let cache = env.TRUE, deps = [], getter: Function | void, setter: Function | void
+    let cache = env.TRUE, sync = env.TRUE, deps = [],
+    getter: Function | void, setter: Function | void
 
     if (is.func(options)) {
       getter = options
@@ -35,6 +38,9 @@ export default class Computed {
     else if (is.object(options)) {
       if (is.boolean(options.cache)) {
         cache = options.cache
+      }
+      if (is.boolean(options.sync)) {
+        sync = options.sync
       }
       if (is.array(options.deps)) {
         deps = options.deps
@@ -48,7 +54,7 @@ export default class Computed {
     }
 
     if (getter) {
-      return new Computed(keypath, cache, deps, observer, getter, setter)
+      return new Computed(keypath, sync, cache, deps, observer, getter, setter)
     }
 
   }
@@ -58,6 +64,8 @@ export default class Computed {
   value: any
 
   deps: string[]
+
+  sync: boolean
 
   cache: boolean
 
@@ -72,13 +80,14 @@ export default class Computed {
   callback: Function
 
   private constructor(
-    keypath: string, cache: boolean, deps: string[],
+    keypath: string, sync: boolean, cache: boolean, deps: string[],
     observer: Observer, getter: Function, setter: Function | void
   ) {
 
     const instance = this
 
     instance.keypath = keypath
+    instance.sync = sync
     instance.cache = cache
     instance.deps = []
 
@@ -170,7 +179,11 @@ export default class Computed {
     const instance = this
     if (!instance.has(dep)) {
       array.push(instance.deps, dep)
-      instance.observer.watch(dep, instance.callback, watchOptions)
+      instance.observer.watch(
+        dep,
+        instance.callback,
+        instance.sync ? syncWatchOptions : asyncWatchOptions
+      )
     }
   }
 
