@@ -1,5 +1,5 @@
 
-import Observer from '../Observer';
+import Observer from '../src/Observer';
 
 it('watch immediate or not', () => {
 
@@ -162,6 +162,14 @@ it('unwatch', done => {
     expect(count).toBe(0)
     done()
   })
+
+})
+
+it('get default value', () => {
+
+  let observer = new Observer()
+
+  expect(observer.get('count', 100)).toBe(100)
 
 })
 

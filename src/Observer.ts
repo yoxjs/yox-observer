@@ -1,8 +1,8 @@
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
-import * as char from 'yox-common/util/char'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
+import * as string from 'yox-common/util/string'
 import * as nextTask from 'yox-common/util/nextTask'
 
 import toNumber from 'yox-common/function/toNumber'
@@ -77,7 +77,7 @@ export default class Observer {
     { data, computed, reversedComputedKeys } = instance
 
     // 传入 '' 获取整个 data
-    if (keypath === char.CHAR_BLANK) {
+    if (keypath === env.EMPTY_STRING) {
       return data
     }
 
@@ -188,7 +188,7 @@ export default class Observer {
      * 比如浏览器中常见的 $0 表示当前选中元素
      * DOM 元素是不能递归的
      */
-    isRecursive = char.codeAt(keypath) !== 36
+    isRecursive = string.codeAt(keypath) !== 36
 
     diffWatcher(
       keypath, newValue, oldValue,
@@ -375,11 +375,11 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      bind(keypath as string, watcher as Function, options || env.plain)
+      bind(keypath as string, watcher as Function, options || env.EMPTY_OBJECT)
       return
     }
 
-    const globalOptions = watcher || env.plain
+    const globalOptions = watcher || env.EMPTY_OBJECT
 
     object.each(
       keypath,
