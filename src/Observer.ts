@@ -3,6 +3,7 @@ import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
+import * as logger from 'yox-common/util/logger'
 
 import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
@@ -12,6 +13,8 @@ import NextTask from 'yox-common/util/NextTask'
 import Computed from './Computed'
 import matchBest from './function/matchBest'
 import diffWatcher from './function/diffWatcher'
+import formatWatchOptions from './function/formatWatchOptions'
+
 
 /**
  * 观察者有两种观察模式：
@@ -335,13 +338,30 @@ export default class Observer {
    * @param options.sync 是否同步响应，默认是异步
    * @param options.once 是否监听一次
    */
-  watch(keypath: string | Record<string, any>, watcher?: Function | Object, options?: Object) {
+  watch(keypath: string | Record<string, any>, watcher?: Function | Record<string, any> | boolean, options?: boolean | Record<string, any>) {
 
     const instance = this,
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, watcher: Function, options: any) {
+    bind = function (keypath: string, watcher: any, options: Record<string, any>) {
+
+      if (is.object(watcher)) {
+
+        if (is.boolean(watcher.immediate)) {
+          options.immediate = watcher.immediate
+        }
+        if (is.boolean(watcher.sync)) {
+          options.sync = watcher.sync
+        }
+        if (is.boolean(watcher.once)) {
+          options.once = watcher.once
+        }
+        if (is.func(watcher.watcher)) {
+          watcher = watcher.watcher
+        }
+
+      }
 
       const emitter = options.sync ? syncEmitter : asyncEmitter
 
@@ -368,28 +388,25 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      bind(keypath as string, watcher as Function, options || env.EMPTY_OBJECT)
+      if (is.func(watcher) || is.object(watcher)) {
+        bind(
+          keypath as string,
+          watcher,
+          formatWatchOptions(options)
+        )
+      }
+      else {
+        logger.fatal('watcher should be a function or object.')
+      }
       return
     }
 
-    const globalOptions = watcher || env.EMPTY_OBJECT
+    const globalOptions = formatWatchOptions(watcher)
 
     object.each(
       keypath,
-      function (value, keypath) {
-        let watcher = value, options: any = object.extend({}, globalOptions)
-        if (is.object(value)) {
-          watcher = value.watcher
-          array.each(
-            ['immediate', 'sync', 'once'],
-            function (field) {
-              if (is.boolean(value[field])) {
-                options[field] = value[field]
-              }
-            }
-          )
-        }
-        bind(keypath, watcher, options)
+      function (value: any, keypath: string) {
+        bind(keypath, value, object.extend({}, globalOptions))
       }
     )
 
@@ -401,7 +418,7 @@ export default class Observer {
    * @param keypath
    * @param watcher
    */
-  unwatch(keypath: string | Object, watcher?: Function) {
+  unwatch(keypath: string | Object, watcher?: Function | Record<string, any>) {
     const { syncEmitter, asyncEmitter } = this
     if (is.string(keypath)) {
       syncEmitter.off(keypath as string, watcher)
@@ -410,7 +427,7 @@ export default class Observer {
     else if (is.object(keypath)) {
       object.each(
         keypath,
-        function (watcher: Function, keypath: string) {
+        function (watcher: Function | Record<string, any>, keypath: string) {
           syncEmitter.off(keypath, watcher)
           asyncEmitter.off(keypath, watcher)
         }
