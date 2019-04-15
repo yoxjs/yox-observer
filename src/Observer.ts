@@ -3,11 +3,11 @@ import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
-import * as nextTask from 'yox-common/util/nextTask'
 
 import toNumber from 'yox-common/function/toNumber'
 import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
+import NextTask from 'yox-common/util/NextTask'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'
@@ -31,6 +31,8 @@ export default class Observer {
   context: any
 
   computed: any
+
+  nextTask: NextTask | void
 
   reversedComputedKeys: string[] | void
 
@@ -286,7 +288,7 @@ export default class Observer {
    * @param keypath
    * @param computed
    */
-  addComputed(keypath: string, options: any): Computed | void {
+  addComputed(keypath: string, options: Function | Record<string, any>): Computed | void {
 
     const instance = this,
     computed = Computed.build(keypath, instance, options)
@@ -333,7 +335,7 @@ export default class Observer {
    * @param options.sync 是否同步响应，默认是异步
    * @param options.once 是否监听一次
    */
-  watch(keypath: string | Object, watcher?: Function | Object, options?: Object) {
+  watch(keypath: string | Record<string, any>, watcher?: Function | Object, options?: Object) {
 
     const instance = this,
 
@@ -538,28 +540,30 @@ export default class Observer {
    * @param task
    */
   nextTick(task: Function) {
-    const instance = this
-    nextTask.append(
-      function () {
-        // 确保没销毁
-        if (instance.data) {
-          task()
-        }
-      }
-    )
+    const nextTask = this.nextTask || (this.nextTask = new NextTask())
+    nextTask.append(task)
   }
 
+  /**
+   * 立即执行异步任务
+   */
   nextRun() {
-    nextTask.run()
+    if (this.nextTask) {
+      this.nextTask.run()
+    }
   }
 
   /**
    * 销毁
    */
   destroy() {
-    this.syncEmitter.off()
-    this.asyncEmitter.off()
-    object.clear(this)
+    const instance = this
+    instance.syncEmitter.off()
+    instance.asyncEmitter.off()
+    if (instance.nextTask) {
+      instance.nextTask.clear()
+    }
+    object.clear(instance)
   }
 
 }

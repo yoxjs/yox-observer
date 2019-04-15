@@ -29,6 +29,6 @@
     "jest": "^24.5.0"
   },
   "dependencies": {
-    "yox-common": "0.17.5"
+    "yox-common": "0.17.7"
   }
 }
