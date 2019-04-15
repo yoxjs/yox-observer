@@ -1,6 +1,6 @@
 {
   "name": "yox-observer",
-  "version": "0.17.4",
+  "version": "0.17.5",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {
@@ -26,7 +26,9 @@
     "@babel/preset-env": "^7.4.2",
     "@babel/preset-typescript": "^7.3.3",
     "babel-jest": "^24.6.0",
-    "jest": "^24.5.0",
+    "jest": "^24.5.0"
+  },
+  "dependencies": {
     "yox-common": "0.17.5"
   }
 }

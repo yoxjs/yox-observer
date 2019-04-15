@@ -42,7 +42,7 @@ export default class Observer {
 
   ticking: boolean | void
 
-  constructor(data?: Object, computed?: Object, context?: any) {
+  constructor(data?: Object, context?: any) {
 
     const instance = this
 
@@ -51,15 +51,6 @@ export default class Observer {
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
     instance.changes = {}
-
-    if (computed) {
-      object.each(
-        computed,
-        function (options, keypath) {
-          instance.addComputed(keypath, options)
-        }
-      )
-    }
 
   }
 

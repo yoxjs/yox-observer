@@ -245,11 +245,13 @@ it('complex undo', done => {
     {
       a: 1,
       b: 2,
-    },
-    {
-      sum: function () {
-        return this.get('a') + this.get('b')
-      }
+    }
+  )
+
+  observer.addComputed(
+    'sum',
+    function () {
+      return this.get('a') + this.get('b')
     }
   )
 
@@ -285,18 +287,24 @@ it('change computed data', done => {
     {
       a: 1,
       b: 2,
-    },
+    }
+  )
+
+  observer.addComputed(
+    'sum1',
+    function () {
+      call1++
+      return this.get('a') + this.get('b')
+    }
+  )
+
+  observer.addComputed(
+    'sum2',
     {
-      sum1: function () {
-        call1++
+      sync: false,
+      get: function () {
+        call2++
         return this.get('a') + this.get('b')
-      },
-      sum2: {
-        sync: false,
-        get: function () {
-          call2++
-          return this.get('a') + this.get('b')
-        }
       }
     }
   )
@@ -341,13 +349,15 @@ it('change computed fuzzy data', done => {
         age1: 1,
         age2: 2,
       }
-    },
+    }
+  )
+
+  observer.addComputed(
+    'sum',
     {
-      sum: {
-        deps: ['user.*'],
-        get: function () {
-          return this.get('user.age1') + this.get('user.age2')
-        }
+      deps: ['user.*'],
+      get: function () {
+        return this.get('user.age1') + this.get('user.age2')
       }
     }
   )
@@ -427,15 +437,17 @@ it('simple dependency', done => {
         { id: 3, selected: true },
         { id: 4, selected: false },
       ]
-    },
+    }
+  )
+
+  observer.addComputed(
+    'selectedList',
     {
-      selectedList: {
-        deps: ['list', 'list.*.selected'],
-        get: function () {
-          return this.get('list').filter(item => {
-            return item.selected
-          })
-        }
+      deps: ['list', 'list.*.selected'],
+      get: function () {
+        return this.get('list').filter(item => {
+          return item.selected
+        })
       }
     }
   )
@@ -523,23 +535,29 @@ it('complex dependency', done => {
         { id: 3, selected: true },
         { id: 4, selected: true },
       ]
-    },
+    }
+  )
+
+  observer.addComputed(
+    'selectedList',
     {
-      selectedList: {
-        deps: ['list', 'list.*.selected'],
-        get: function () {
-          return this.get('list').filter(item => {
-            return item.selected
-          })
-        }
-      },
-      sortedSelectedList: {
-        deps: ['selectedList'],
-        get: function () {
-          return this.get('selectedList').sort((a, b) => {
-            return a.id - b.id
-          })
-        }
+      deps: ['list', 'list.*.selected'],
+      get: function () {
+        return this.get('list').filter(item => {
+          return item.selected
+        })
+      }
+    }
+  )
+
+  observer.addComputed(
+    'sortedSelectedList',
+    {
+      deps: ['selectedList'],
+      get: function () {
+        return this.get('selectedList').sort((a, b) => {
+          return a.id - b.id
+        })
       }
     }
   )
