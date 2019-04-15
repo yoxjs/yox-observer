@@ -143,6 +143,7 @@ it('watch once', done => {
 
 })
 
+
 it('unwatch', done => {
 
   let observer = new Observer({ })

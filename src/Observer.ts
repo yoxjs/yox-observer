@@ -365,13 +365,18 @@ export default class Observer {
 
       const emitter = options.sync ? syncEmitter : asyncEmitter
 
-      emitter[options.once ? 'once' : 'on'](
-        keypath,
-        {
-          func: watcher,
-          dirty: 0,
-        }
-      )
+      if (is.func(watcher)) {
+        emitter[options.once ? 'once' : 'on'](
+          keypath,
+          {
+            func: watcher,
+            dirty: 0,
+          }
+        )
+      }
+      else {
+        logger.fatal('watcher should be a function.')
+      }
 
       if (options.immediate) {
         execute(
@@ -409,6 +414,24 @@ export default class Observer {
         bind(keypath, value, object.extend({}, globalOptions))
       }
     )
+
+  }
+
+  /**
+   * 监听一次数据变化
+   */
+  watchOnce(keypath: string | Record<string, any>, watcher?: Function | Record<string, any>, options?: Record<string, any>) {
+
+    if (is.string(keypath)) {
+      const watchOptions = formatWatchOptions(options)
+      watchOptions.once = env.TRUE
+      this.watch(keypath, watcher, watchOptions)
+      return
+    }
+
+    const watchOptions = formatWatchOptions(watcher)
+    watchOptions.once = env.TRUE
+    this.watch(keypath, watchOptions)
 
   }
 
