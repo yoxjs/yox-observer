@@ -1,4 +1,5 @@
 import execute from 'yox-common/function/execute'
+
 import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
@@ -27,7 +28,7 @@ export default class Computed {
    * @param observer
    * @param options
    */
-  static build(keypath: string, observer: any, options: any): Computed | void {
+  static build(keypath: string, observer: Observer, options: any): Computed | void {
 
     let cache = env.TRUE, sync = env.TRUE, deps = [],
     getter: Function | void, setter: Function | void

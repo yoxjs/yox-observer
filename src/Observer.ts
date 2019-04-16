@@ -13,8 +13,8 @@ import NextTask from 'yox-common/util/NextTask'
 import Computed from './Computed'
 import matchBest from './function/matchBest'
 import diffWatcher from './function/diffWatcher'
+import filterWatcher from './function/filterWatcher'
 import formatWatchOptions from './function/formatWatchOptions'
-
 
 /**
  * 观察者有两种观察模式：
@@ -33,9 +33,9 @@ export default class Observer {
 
   context: any
 
-  computed: any
+  nextTask: NextTask
 
-  nextTask: NextTask | void
+  computed: Record<string, Computed> | void
 
   reversedComputedKeys: string[] | void
 
@@ -45,7 +45,7 @@ export default class Observer {
 
   changes: Object
 
-  ticking: boolean | void
+  pending: boolean | void
 
   constructor(data?: Object, context?: any) {
 
@@ -53,6 +53,8 @@ export default class Observer {
 
     instance.data = data || {}
     instance.context = context || instance
+    instance.nextTask = new NextTask()
+
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
     instance.changes = {}
@@ -223,12 +225,12 @@ export default class Observer {
           array.push(list, watchKeypath)
         }
 
-        if (!instance.ticking) {
-          instance.ticking = env.TRUE
-          instance.nextTick(
+        if (!instance.pending) {
+          instance.pending = env.TRUE
+          instance.nextTask.append(
             function () {
-              if (instance.ticking) {
-                instance.ticking = env.UNDEFINED
+              if (instance.pending) {
+                instance.pending = env.UNDEFINED
                 instance.diffAsync()
               }
             }
@@ -246,21 +248,7 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, changes, context } = instance,
-
-    filter = function (item: any, args: any): boolean | void {
-      if (item.dirty > 0) {
-
-        // 采用计数器的原因是，同一个 item 可能执行多次
-        // 比如监听 user.*，如果同批次修改了 user.name 和 user.age
-        // 这个监听器会调用多次，如果第一次执行就把 dirty 干掉了，第二次就无法执行了
-
-        item.dirty--
-
-        return args[0] !== args[1]
-
-      }
-    }
+    { asyncEmitter, changes, context } = instance
 
     instance.changes = {}
 
@@ -276,7 +264,7 @@ export default class Observer {
         array.each(
           item.list,
           function (watchKeypath) {
-            asyncEmitter.fire(watchKeypath, args, context, filter)
+            asyncEmitter.fire(watchKeypath, args, context, filterWatcher)
           }
         )
 
@@ -575,22 +563,13 @@ export default class Observer {
   }
 
   /**
-   * 新增异步任务
+   * 拷贝任意数据，支持深拷贝
    *
-   * @param task
+   * @param data
+   * @param deep
    */
-  nextTick(task: Function) {
-    const nextTask = this.nextTask || (this.nextTask = new NextTask())
-    nextTask.append(task)
-  }
-
-  /**
-   * 立即执行异步任务
-   */
-  nextRun() {
-    if (this.nextTask) {
-      this.nextTask.run()
-    }
+  copy<T>(data: T, deep?: boolean): T {
+    return object.copy(data, deep)
   }
 
   /**
@@ -600,9 +579,7 @@ export default class Observer {
     const instance = this
     instance.syncEmitter.off()
     instance.asyncEmitter.off()
-    if (instance.nextTask) {
-      instance.nextTask.clear()
-    }
+    instance.nextTask.clear()
     object.clear(instance)
   }
 

@@ -99,7 +99,7 @@ it('watch sync', done => {
   expect(count2).toBe(0)
   expect(count3).toBe(0)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(count1).toBe(1)
     expect(count2).toBe(1)
     expect(count3).toBe(0)
@@ -128,13 +128,13 @@ it('watch once', done => {
 
   expect(count).toBe(0)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(count).toBe(1)
 
     observer.set('name', 2)
 
     expect(count).toBe(1)
-    observer.nextTick(function () {
+    observer.nextTask.append(function () {
       expect(count).toBe(1)
       done()
     })
@@ -159,7 +159,7 @@ it('unwatch', done => {
   expect(count).toBe(0)
   observer.unwatch('name', watcher)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(count).toBe(0)
     done()
   })
@@ -233,7 +233,7 @@ it('simple undo', done => {
 
   expect(count).toBe(0)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(count).toBe(0)
     done()
   })
@@ -273,7 +273,7 @@ it('complex undo', done => {
   observer.set('a', 1)
   observer.set('b', 2)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(observer.get('sum')).toBe(3)
     expect(count).toBe(0)
     done()
@@ -332,7 +332,7 @@ it('change computed data', done => {
   expect(count).toBe(0)
   expect(observer.get('sum1')).toBe(5)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(call1).toBe(3)
     expect(call2).toBe(2)
     expect(sum1).toBe(5)
@@ -378,7 +378,7 @@ it('change computed fuzzy data', done => {
   expect(count).toBe(0)
   expect(observer.get('sum')).toBe(5)
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(sum).toBe(5)
     expect(count).toBe(1)
     done()
@@ -409,7 +409,7 @@ it('watch object property', done => {
   observer.watch('user.*', watcher2)
   observer.set('user.name', 'yox1')
 
-  observer.nextTick(function () {
+  observer.nextTask.append(function () {
     expect(count1).toBe(1)
     expect(count2).toBe(1)
 
@@ -418,7 +418,7 @@ it('watch object property', done => {
       age: 2
     })
 
-    observer.nextTick(function () {
+    observer.nextTask.append(function () {
       expect(count1).toBe(2)
       expect(count2).toBe(3)
       done()
@@ -470,7 +470,7 @@ it('simple dependency', done => {
 
   observer.set('list.0.selected', false)
 
-  observer.nextTick(() => {
+  observer.nextTask.append(() => {
 
 
     expect(count1).toBe(1)
@@ -480,7 +480,7 @@ it('simple dependency', done => {
 
     observer.set('list.0.selected', false)
 
-    observer.nextTick(() => {
+    observer.nextTask.append(() => {
 
       expect(count1).toBe(1)
       expect(selected1New).toBe(false)
@@ -489,7 +489,7 @@ it('simple dependency', done => {
 
       observer.set('list.0.selected', true)
 
-      observer.nextTick(() => {
+      observer.nextTask.append(() => {
 
         expect(count1).toBe(2)
         expect(selected1New).toBe(true)
@@ -503,7 +503,7 @@ it('simple dependency', done => {
           { id: 4, selected: false },
         ])
 
-        observer.nextTick(() => {
+        observer.nextTask.append(() => {
           expect(count1).toBe(3)
           expect(selected1New).toBe(false)
           expect(selected1Old).toBe(true)
@@ -590,7 +590,7 @@ it('complex dependency', done => {
   })
 
   observer.set('list.0.selected', false)
-  observer.nextTick(() => {
+  observer.nextTask.append(() => {
     expect(list0Count).toBe(1)
     expect(list0SelectedNew).toBe(false)
     expect(list0SelectedOld).toBe(true)
