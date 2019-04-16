@@ -1,3 +1,4 @@
+import isDef from 'yox-common/function/isDef'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 import * as string from 'yox-common/util/string'
@@ -5,8 +6,6 @@ import * as keypathUtil from 'yox-common/util/keypath'
 
 import readValue from './readValue'
 import diffRecursion from './diffRecursion'
-import isFuzzyKeypath from './isFuzzyKeypath'
-import matchFuzzyKeypath from './matchFuzzyKeypath'
 
 export default function (
   keypath: string, newValue: any, oldValue: any,
@@ -21,14 +20,14 @@ export default function (
     function (_, watchKeypath) {
 
       // 模糊监听，如 users.*.name
-      if (isFuzzyKeypath(watchKeypath)) {
+      if (keypathUtil.isFuzzy(watchKeypath)) {
 
         // 如果当前修改的是 users.0 整个对象
         // users.0 和 users.*.name 无法匹配
         // 此时要知道设置 users.0 到底会不会改变 users.*.name 需要靠递归了
 
         // 如果匹配，则无需递归
-        if (matchFuzzyKeypath(keypath, watchKeypath)) {
+        if (isDef(keypathUtil.matchFuzzy(keypath, watchKeypath))) {
           callback(
             watchKeypath, keypath, oldValue
           )

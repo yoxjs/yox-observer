@@ -479,7 +479,7 @@ export default class Observer {
    *
    * @param keypath 值必须能转型成数字，如果不能，则默认从 0 开始递增
    * @param step 步进值，默认是 1
-   * @param min 可以递增到的最小值，默认不限制
+   * @param max 可以递增到的最大值，默认不限制
    */
   increase(keypath: string, step = 1, max?: number): number | void {
     const value = toNumber(this.get(keypath), 0) + step
