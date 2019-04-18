@@ -8,9 +8,11 @@ import * as object from 'yox-common/util/object'
 // TS 循环依赖居然不报错...
 import Observer from './Observer'
 
-const syncWatchOptions = { sync: env.TRUE }
+import * as signature from 'yox-type/src/signature'
 
-const asyncWatchOptions = { sync: env.FALSE }
+const syncWatchOptions = { sync: env.TRUE },
+
+asyncWatchOptions = { sync: env.FALSE }
 
 /**
  * 计算属性
@@ -30,8 +32,15 @@ export default class Computed {
    */
   static build(keypath: string, observer: Observer, options: any): Computed | void {
 
-    let cache = env.TRUE, sync = env.TRUE, deps = [],
-    getter: Function | void, setter: Function | void
+    let cache = env.TRUE,
+
+    sync = env.TRUE,
+
+    deps = env.EMPTY_ARRAY,
+
+    getter: signature.computedGetter | void,
+
+    setter: signature.computedSetter | void
 
     if (is.func(options)) {
       getter = options
@@ -76,13 +85,13 @@ export default class Computed {
 
   observer: Observer
 
-  getter: Function
-  setter: Function | void
-  callback: Function
+  getter: signature.computedGetter
+  setter: signature.computedSetter | void
+  callback: signature.watcher
 
   private constructor(
     keypath: string, sync: boolean, cache: boolean, deps: string[],
-    observer: Observer, getter: Function, setter: Function | void
+    observer: Observer, getter: signature.computedGetter, setter: signature.computedSetter | void
   ) {
 
     const instance = this
@@ -97,12 +106,16 @@ export default class Computed {
     instance.getter = getter
     instance.setter = setter
 
-    instance.callback = function () {
+    instance.callback = function ($0: any, $1: any, $2: string) {
+
+      // 计算属性的依赖变了会走进这里
       const oldValue = instance.value,
       newValue = instance.get(env.TRUE)
+
       if (newValue !== oldValue) {
         observer.diffSync(keypath, newValue, oldValue)
       }
+
     }
 
     if (instance.frozen = !array.falsy(deps)) {

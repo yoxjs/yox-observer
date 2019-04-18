@@ -9,7 +9,7 @@ import diffObject from './diffObject'
 export default function diffRecursion(
   keypath: string, newValue: any, oldValue: any,
   watchFuzzyKeypaths: string[],
-  callback: (watchKeypath: string, keypath: string, oldValue: any) => void
+  callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
 
   const diff = function (subKeypath: string | number, subNewValue: any, subOldValue: any) {
@@ -23,7 +23,7 @@ export default function diffRecursion(
         function (fuzzyKeypath) {
           if (isDef(keypathUtil.matchFuzzy(newKeypath, fuzzyKeypath))) {
             callback(
-              fuzzyKeypath, newKeypath, subOldValue
+              fuzzyKeypath, newKeypath, subNewValue, subOldValue
             )
           }
         }

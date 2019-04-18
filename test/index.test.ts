@@ -71,6 +71,7 @@ it('watch sync', done => {
   observer.watch(
     'name',
     function () {
+      expect(arguments.length).toBe(3)
       count1++
     },
     {
@@ -81,6 +82,7 @@ it('watch sync', done => {
   observer.watch(
     'name',
     function () {
+      expect(arguments.length).toBe(3)
       count2++
     }
   )

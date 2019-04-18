@@ -9,10 +9,11 @@ import diffRecursion from './diffRecursion'
 
 export default function (
   keypath: string, newValue: any, oldValue: any,
-  watcher: Object, isRecursive: boolean, callback: (watchKeypath: string, keypath: string, oldValue: any) => void
+  watcher: Object, isRecursive: boolean,
+  callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
 
-  let fuzzyKeypaths: any[] | void
+  let fuzzyKeypaths: string[] | void
 
   // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
   object.each(
@@ -29,7 +30,7 @@ export default function (
         // 如果匹配，则无需递归
         if (isDef(keypathUtil.matchFuzzy(keypath, watchKeypath))) {
           callback(
-            watchKeypath, keypath, oldValue
+            watchKeypath, keypath, newValue, oldValue
           )
         }
         else if (isRecursive) {
@@ -58,7 +59,7 @@ export default function (
 
         if (subNewValue !== subOldValue) {
           callback(
-            watchKeypath, watchKeypath, subOldValue
+            watchKeypath, watchKeypath, subNewValue, subOldValue
           )
         }
 

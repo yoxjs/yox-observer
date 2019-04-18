@@ -10,11 +10,15 @@ import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 import NextTask from 'yox-common/util/NextTask'
 
+import * as signature from 'yox-type/src/signature'
+import ComputedOptions from 'yox-type/src/ComputedOptions'
+import WatcherOptions from 'yox-type/src/WatcherOptions'
+
 import Computed from './Computed'
 import matchBest from './function/matchBest'
 import diffWatcher from './function/diffWatcher'
 import filterWatcher from './function/filterWatcher'
-import formatWatchOptions from './function/formatWatchOptions'
+import formatWatcherOptions from './function/formatWatcherOptions'
 
 /**
  * 观察者有两种观察模式：
@@ -191,8 +195,8 @@ export default class Observer {
     diffWatcher(
       keypath, newValue, oldValue,
       syncEmitter.listeners, isRecursive,
-      function (watchKeypath: string) {
-        syncEmitter.fire(watchKeypath)
+      function (watchKeypath: string, keypath: string, newValue: any, oldValue: any) {
+        syncEmitter.fire(watchKeypath, [newValue, oldValue, keypath])
       }
     )
 
@@ -211,7 +215,7 @@ export default class Observer {
     diffWatcher(
       keypath, newValue, oldValue,
       asyncEmitter.listeners, isRecursive,
-      function (watchKeypath: string, keypath: string, value: any) {
+      function (watchKeypath: string, keypath: string, newValue: any, oldValue: any) {
 
         array.each(
           asyncEmitter.listeners[watchKeypath],
@@ -220,7 +224,7 @@ export default class Observer {
           }
         )
 
-        const { list } = changes[keypath] || (changes[keypath] = { value, list: [] })
+        const { list } = changes[keypath] || (changes[keypath] = { value: oldValue, list: [] })
         if (!array.has(list, watchKeypath)) {
           array.push(list, watchKeypath)
         }
@@ -248,7 +252,7 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, changes, context } = instance
+    { asyncEmitter, changes } = instance
 
     instance.changes = {}
 
@@ -263,7 +267,7 @@ export default class Observer {
 
         array.each(
           item.list,
-          function (watchKeypath) {
+          function (watchKeypath: string) {
             asyncEmitter.fire(watchKeypath, args, filterWatcher)
           }
         )
@@ -279,7 +283,7 @@ export default class Observer {
    * @param keypath
    * @param computed
    */
-  addComputed(keypath: string, options: Function | Record<string, any>): Computed | void {
+  addComputed(keypath: string, options: signature.computedGetter | ComputedOptions): Computed | void {
 
     const instance = this,
     computed = Computed.build(keypath, instance, options)
@@ -326,13 +330,17 @@ export default class Observer {
    * @param options.sync 是否同步响应，默认是异步
    * @param options.once 是否监听一次
    */
-  watch(keypath: string | Record<string, any>, watcher?: Function | Record<string, any> | boolean, options?: boolean | Record<string, any>) {
+  watch(
+    keypath: string | Record<string, signature.watcher | WatcherOptions>,
+    watcher?: signature.watcher,
+    options?: WatcherOptions | boolean
+  ) {
 
     const instance = this,
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, watcher: any, options: Record<string, any>) {
+    bind = function (keypath: string, watcher: any, options: WatcherOptions) {
 
       if (is.object(watcher)) {
 
@@ -386,7 +394,7 @@ export default class Observer {
         bind(
           keypath as string,
           watcher,
-          formatWatchOptions(options)
+          formatWatcherOptions(options)
         )
       }
       else {
@@ -395,12 +403,10 @@ export default class Observer {
       return
     }
 
-    const globalOptions = formatWatchOptions(watcher)
-
     object.each(
       keypath,
       function (value: any, keypath: string) {
-        bind(keypath, value, object.extend({}, globalOptions))
+        bind(keypath, value, {})
       }
     )
 
@@ -409,18 +415,15 @@ export default class Observer {
   /**
    * 监听一次数据变化
    */
-  watchOnce(keypath: string | Record<string, any>, watcher?: Function | Record<string, any>, options?: Record<string, any>) {
+  watchOnce(
+    keypath: string,
+    watcher: signature.watcher,
+    options?: WatcherOptions
+  ) {
 
-    if (is.string(keypath)) {
-      const watchOptions = formatWatchOptions(options)
-      watchOptions.once = env.TRUE
-      this.watch(keypath, watcher, watchOptions)
-      return
-    }
-
-    const watchOptions = formatWatchOptions(watcher)
-    watchOptions.once = env.TRUE
-    this.watch(keypath, watchOptions)
+    const watcherOptions = formatWatcherOptions(options)
+    watcherOptions.once = env.TRUE
+    this.watch(keypath, watcher, watcherOptions)
 
   }
 
@@ -430,21 +433,12 @@ export default class Observer {
    * @param keypath
    * @param watcher
    */
-  unwatch(keypath: string | Object, watcher?: Function | Record<string, any>) {
-    const { syncEmitter, asyncEmitter } = this
-    if (is.string(keypath)) {
-      syncEmitter.off(keypath as string, watcher)
-      asyncEmitter.off(keypath as string, watcher)
-    }
-    else if (is.object(keypath)) {
-      object.each(
-        keypath,
-        function (watcher: Function | Record<string, any>, keypath: string) {
-          syncEmitter.off(keypath, watcher)
-          asyncEmitter.off(keypath, watcher)
-        }
-      )
-    }
+  unwatch(
+    keypath: string,
+    watcher?: signature.watcher
+  ) {
+    this.syncEmitter.off(keypath, watcher)
+    this.asyncEmitter.off(keypath, watcher)
   }
 
   /**
