@@ -264,7 +264,7 @@ export default class Observer {
         array.each(
           item.list,
           function (watchKeypath) {
-            asyncEmitter.fire(watchKeypath, args, context, filterWatcher)
+            asyncEmitter.fire(watchKeypath, args, filterWatcher)
           }
         )
 
@@ -358,6 +358,7 @@ export default class Observer {
           keypath,
           {
             func: watcher,
+            ctx: context,
             dirty: 0,
           }
         )
