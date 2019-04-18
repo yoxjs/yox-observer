@@ -79,7 +79,7 @@ export default class Computed {
 
   cache: boolean
 
-  frozen: boolean
+  fixed: boolean
 
   context: any
 
@@ -118,7 +118,7 @@ export default class Computed {
 
     }
 
-    if (instance.frozen = !array.falsy(deps)) {
+    if (instance.fixed = !array.falsy(deps)) {
       array.each(
         deps,
         function (dep) {
@@ -149,7 +149,7 @@ export default class Computed {
     else if (force || !object.has(instance, 'value')) {
 
       // 如果写死了依赖，则不需要收集依赖
-      if (instance.frozen) {
+      if (instance.fixed) {
         instance.value = execute(getter, context)
       }
       else {
