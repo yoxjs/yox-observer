@@ -5,3 +5,4 @@ node_modules
 .npmignore
 package-lock.json
 yarn.lock
+jest.config.js

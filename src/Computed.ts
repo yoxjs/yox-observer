@@ -6,8 +6,9 @@ import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 
 import * as type from 'yox-type/src/type'
-import Observer from 'yox-type/src/Observer'
-import WatcherOptions from 'yox-type/src/WatcherOptions'
+import ComputedInterface from 'yox-type/src/Computed'
+import ObserverInterface from 'yox-type/src/Observer'
+import WatcherOptions from 'yox-type/src/options/Watcher'
 
 const syncWatcherOptions: WatcherOptions = { sync: env.TRUE },
 
@@ -18,7 +19,7 @@ asyncWatcherOptions: WatcherOptions = { sync: env.FALSE }
  *
  * 可配置 cache、deps、get、set 等
  */
-export default class Computed {
+export default class Computed implements ComputedInterface {
 
   static current?: Computed
 
@@ -29,7 +30,7 @@ export default class Computed {
    * @param observer
    * @param options
    */
-  static build(keypath: string, observer: Observer, options: any): Computed | void {
+  static build(keypath: string, observer: ObserverInterface, options: any): Computed | void {
 
     let cache = env.TRUE,
 
@@ -82,10 +83,12 @@ export default class Computed {
 
   context: any
 
-  observer: Observer
+  observer: ObserverInterface
 
   getter: type.computedGetter
+
   setter: type.computedSetter | void
+
   callback: type.watcher
 
   private constructor(
@@ -93,7 +96,7 @@ export default class Computed {
     sync: boolean,
     cache: boolean,
     deps: string[],
-    observer: Observer,
+    observer: ObserverInterface,
     getter: type.computedGetter,
     setter: type.computedSetter | void
   ) {
@@ -140,7 +143,7 @@ export default class Computed {
    *
    * @param force 是否强制刷新缓存
    */
-  get(force = false): any {
+  get(force?: boolean): any {
 
     const instance = this,
 
@@ -174,7 +177,7 @@ export default class Computed {
     return instance.value
   }
 
-  set(value: any) {
+  set(value: any): void {
     const { setter, context } = this
     if (setter) {
       setter.call(context, value)
@@ -195,7 +198,7 @@ export default class Computed {
    *
    * @param dep
    */
-  add(dep: string) {
+  add(dep: string): void {
     const instance = this
     if (!instance.has(dep)) {
       array.push(instance.deps, dep)
@@ -212,7 +215,7 @@ export default class Computed {
    *
    * @param dep
    */
-  remove(dep: string) {
+  remove(dep: string): void {
     const instance = this
     if (array.remove(instance.deps, dep) > 0) {
       instance.observer.unwatch(dep, instance.callback)
@@ -222,7 +225,7 @@ export default class Computed {
   /**
    * 清空依赖
    */
-  clear() {
+  clear(): void {
     const instance = this
     array.each(
       instance.deps,

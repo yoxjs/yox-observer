@@ -2,7 +2,7 @@ import * as is from 'yox-common/util/is'
 import * as env from 'yox-common/util/env'
 import * as object from 'yox-common/util/object'
 
-import WatcherOptions from 'yox-type/src/WatcherOptions'
+import WatcherOptions from 'yox-type/src/options/Watcher'
 
 /**
  * 格式化 watch options

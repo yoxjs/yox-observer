@@ -11,8 +11,9 @@ import Emitter from 'yox-common/util/Emitter'
 import NextTask from 'yox-common/util/NextTask'
 
 import * as type from 'yox-type/src/type'
-import ComputedOptions from 'yox-type/src/ComputedOptions'
-import WatcherOptions from 'yox-type/src/WatcherOptions'
+import ComputedOptions from 'yox-type/src/options/Computed'
+import WatcherOptions from 'yox-type/src/options/Watcher'
+import EmitterOptions from 'yox-type/src/options/Emitter'
 import ObserverInterface from 'yox-type/src/Observer'
 
 import Computed from './Computed'
@@ -40,17 +41,17 @@ export default class Observer implements ObserverInterface {
 
   nextTask: NextTask
 
-  computed: Record<string, Computed> | void
+  computed?: Record<string, Computed>
 
-  reversedComputedKeys: string[] | void
+  reversedComputedKeys?: string[]
 
   syncEmitter: Emitter
 
   asyncEmitter: Emitter
 
-  changes: Object
+  asyncChanges: Object
 
-  pending: boolean | void
+  pending?: boolean
 
   constructor(data?: Object, context?: any) {
 
@@ -62,7 +63,7 @@ export default class Observer implements ObserverInterface {
 
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
-    instance.changes = {}
+    instance.asyncChanges = {}
 
   }
 
@@ -184,7 +185,7 @@ export default class Observer implements ObserverInterface {
 
     const instance = this,
 
-    { syncEmitter, asyncEmitter, changes } = instance,
+    { syncEmitter, asyncEmitter, asyncChanges } = instance,
 
     /**
      * 我们认为 $ 开头的变量是不可递归的
@@ -221,11 +222,11 @@ export default class Observer implements ObserverInterface {
         array.each(
           asyncEmitter.listeners[watchKeypath],
           function (item) {
-            item.dirty++
+            item.count++
           }
         )
 
-        const { list } = changes[keypath] || (changes[keypath] = { value: oldValue, list: [] })
+        const { list } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, list: [] })
         if (!array.has(list, watchKeypath)) {
           array.push(list, watchKeypath)
         }
@@ -253,18 +254,18 @@ export default class Observer implements ObserverInterface {
 
     const instance = this,
 
-    { asyncEmitter, changes } = instance
+    { asyncEmitter, asyncChanges } = instance
 
-    instance.changes = {}
+    instance.asyncChanges = {}
 
     object.each(
-      changes,
+      asyncChanges,
       function (item, keypath) {
 
         const args = [instance.get(keypath), item.value, keypath]
 
         // 不能在这判断新旧值是否相同，相同就不 fire
-        // 因为前面标记了 dirty，在这中断会导致 dirty 无法清除
+        // 因为前面标记了 count，在这中断会导致 count 无法清除
 
         array.each(
           item.list,
@@ -363,14 +364,12 @@ export default class Observer implements ObserverInterface {
       const emitter = options.sync ? syncEmitter : asyncEmitter
 
       if (is.func(watcher)) {
-        emitter[options.once ? 'once' : 'on'](
-          keypath,
-          {
-            func: watcher,
-            ctx: context,
-            dirty: 0,
-          }
-        )
+        const listener: EmitterOptions = {
+          fn: watcher,
+          ctx: context,
+          count: 0,
+        }
+        emitter[options.once ? 'once' : 'on'](keypath, listener)
       }
       else {
         logger.fatal('watcher should be a function.')
