@@ -10,9 +10,10 @@ import execute from 'yox-common/function/execute'
 import Emitter from 'yox-common/util/Emitter'
 import NextTask from 'yox-common/util/NextTask'
 
-import * as signature from 'yox-type/src/signature'
+import * as type from 'yox-type/src/type'
 import ComputedOptions from 'yox-type/src/ComputedOptions'
 import WatcherOptions from 'yox-type/src/WatcherOptions'
+import ObserverInterface from 'yox-type/src/Observer'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'
@@ -31,9 +32,9 @@ import formatWatcherOptions from './function/formatWatcherOptions'
  *
  * 对于外部调用 observer.watch('keypath', listener)，属于异步监听，它只关心是否变了，而不关心是否是立即触发的
  */
-export default class Observer {
+export default class Observer implements ObserverInterface {
 
-  data: Object
+  data: Record<string, any>
 
   context: any
 
@@ -121,7 +122,7 @@ export default class Observer {
    * @param keypath
    * @param value
    */
-  set(keypath: any, value: any) {
+  set(keypath: string | Record<string, any>, value: any) {
 
     const instance = this,
 
@@ -164,7 +165,7 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      setValue(value, keypath)
+      setValue(value, keypath as string)
     }
     else if (is.object(keypath)) {
       object.each(keypath, setValue)
@@ -179,7 +180,7 @@ export default class Observer {
    * @param newValue
    * @param oldValue
    */
-  diffSync(keypath: string, newValue: any, oldValue: any) {
+  diffSync(keypath: string, newValue: any, oldValue: any): void {
 
     const instance = this,
 
@@ -248,7 +249,7 @@ export default class Observer {
   /**
    * 异步触发的 diff
    */
-  diffAsync() {
+  diffAsync(): void {
 
     const instance = this,
 
@@ -283,7 +284,7 @@ export default class Observer {
    * @param keypath
    * @param computed
    */
-  addComputed(keypath: string, options: signature.computedGetter | ComputedOptions): Computed | void {
+  addComputed(keypath: string, options: type.computedGetter | ComputedOptions): Computed | void {
 
     const instance = this,
     computed = Computed.build(keypath, instance, options)
@@ -308,7 +309,7 @@ export default class Observer {
    *
    * @param keypath
    */
-  removeComputed(keypath: string) {
+  removeComputed(keypath: string): void {
 
     const instance = this,
     { computed } = instance
@@ -331,8 +332,8 @@ export default class Observer {
    * @param options.once 是否监听一次
    */
   watch(
-    keypath: string | Record<string, signature.watcher | WatcherOptions>,
-    watcher?: signature.watcher,
+    keypath: string | Record<string, type.watcher | WatcherOptions>,
+    watcher?: type.watcher,
     options?: WatcherOptions | boolean
   ) {
 
@@ -417,7 +418,7 @@ export default class Observer {
    */
   watchOnce(
     keypath: string,
-    watcher: signature.watcher,
+    watcher: type.watcher,
     options?: WatcherOptions
   ) {
 
@@ -435,7 +436,7 @@ export default class Observer {
    */
   unwatch(
     keypath: string,
-    watcher?: signature.watcher
+    watcher?: type.watcher
   ) {
     this.syncEmitter.off(keypath, watcher)
     this.asyncEmitter.off(keypath, watcher)
@@ -450,7 +451,7 @@ export default class Observer {
    * @return 取反后的布尔值
    */
   toggle(keypath: string): boolean {
-    let value = !this.get(keypath)
+    const value = !this.get(keypath)
     this.set(keypath, value)
     return value
   }
@@ -464,8 +465,8 @@ export default class Observer {
    * @param step 步进值，默认是 1
    * @param max 可以递增到的最大值，默认不限制
    */
-  increase(keypath: string, step = 1, max?: number): number | void {
-    const value = toNumber(this.get(keypath), 0) + step
+  increase(keypath: string, step?: number, max?: number): number | void {
+    const value = toNumber(this.get(keypath), 0) + (step || 1)
     if (!is.number(max) || value <= (max as number)) {
       this.set(keypath, value)
       return value
@@ -481,8 +482,8 @@ export default class Observer {
    * @param step 步进值，默认是 1
    * @param min 可以递减到的最小值，默认不限制
    */
-  decrease(keypath: string, step = 1, min?: number): number | void {
-    const value = toNumber(this.get(keypath), 0) - step
+  decrease(keypath: string, step?: number, min?: number): number | void {
+    const value = toNumber(this.get(keypath), 0) - (step || 1)
     if (!is.number(min) || value >= (min as number)) {
       this.set(keypath, value)
       return value
@@ -519,6 +520,26 @@ export default class Observer {
 
     return env.TRUE
 
+  }
+
+  /**
+   * 在数组尾部添加元素
+   *
+   * @param keypath
+   * @param item
+   */
+  append(keypath: string, item: any): boolean | void {
+    return this.insert(keypath, item, env.TRUE)
+  }
+
+  /**
+   * 在数组首部添加元素
+   *
+   * @param keypath
+   * @param item
+   */
+  prepend(keypath: string, item: any): boolean | void {
+    return this.insert(keypath, item, env.FALSE)
   }
 
   /**

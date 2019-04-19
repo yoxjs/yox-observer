@@ -1,12 +1,14 @@
+import * as type from 'yox-type/src/type'
+
 /**
  * 触发异步变化时，用此函数过滤下，哪些 listener 应该执行
  *
  * @param item
- * @param args
+ * @param data
  */
-export default function (item: Record<string, any>, args?: Record<string, any> | any[]): boolean | void {
+export default function (item: Record<string, any>, data: type.eventData | any[] | void): boolean | void {
 
-  if (item.dirty > 0 && args) {
+  if (item.dirty > 0 && data) {
 
     // 采用计数器的原因是，同一个 item 可能执行多次
     // 比如监听 user.*，如果同批次修改了 user.name 和 user.age
@@ -15,7 +17,7 @@ export default function (item: Record<string, any>, args?: Record<string, any> |
     item.dirty--
 
     // 新旧值不相等
-    return args[0] !== args[1]
+    return data[0] !== data[1]
 
   }
 

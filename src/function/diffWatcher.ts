@@ -13,7 +13,7 @@ export default function (
   callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
 
-  let fuzzyKeypaths: string[] | void
+  let fuzzyKeypaths: string[] | undefined
 
   // 遍历监听的 keypath，如果未被监听，则无需触发任何事件
   object.each(

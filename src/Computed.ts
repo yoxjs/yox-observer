@@ -5,14 +5,13 @@ import * as env from 'yox-common/util/env'
 import * as array from 'yox-common/util/array'
 import * as object from 'yox-common/util/object'
 
-// TS 循环依赖居然不报错...
-import Observer from './Observer'
+import * as type from 'yox-type/src/type'
+import Observer from 'yox-type/src/Observer'
+import WatcherOptions from 'yox-type/src/WatcherOptions'
 
-import * as signature from 'yox-type/src/signature'
+const syncWatcherOptions: WatcherOptions = { sync: env.TRUE },
 
-const syncWatchOptions = { sync: env.TRUE },
-
-asyncWatchOptions = { sync: env.FALSE }
+asyncWatcherOptions: WatcherOptions = { sync: env.FALSE }
 
 /**
  * 计算属性
@@ -38,9 +37,9 @@ export default class Computed {
 
     deps = env.EMPTY_ARRAY,
 
-    getter: signature.computedGetter | void,
+    getter: type.computedGetter | void,
 
-    setter: signature.computedSetter | void
+    setter: type.computedSetter | void
 
     if (is.func(options)) {
       getter = options
@@ -85,13 +84,18 @@ export default class Computed {
 
   observer: Observer
 
-  getter: signature.computedGetter
-  setter: signature.computedSetter | void
-  callback: signature.watcher
+  getter: type.computedGetter
+  setter: type.computedSetter | void
+  callback: type.watcher
 
   private constructor(
-    keypath: string, sync: boolean, cache: boolean, deps: string[],
-    observer: Observer, getter: signature.computedGetter, setter: signature.computedSetter | void
+    keypath: string,
+    sync: boolean,
+    cache: boolean,
+    deps: string[],
+    observer: Observer,
+    getter: type.computedGetter,
+    setter: type.computedSetter | void
   ) {
 
     const instance = this
@@ -99,6 +103,7 @@ export default class Computed {
     instance.keypath = keypath
     instance.sync = sync
     instance.cache = cache
+    // 因为可能会修改 deps，所以这里创建一个自己的对象，避免影响外部传入的 deps
     instance.deps = []
 
     instance.context = observer.context
@@ -109,6 +114,7 @@ export default class Computed {
     instance.callback = function ($0: any, $1: any, $2: string) {
 
       // 计算属性的依赖变了会走进这里
+
       const oldValue = instance.value,
       newValue = instance.get(env.TRUE)
 
@@ -196,7 +202,7 @@ export default class Computed {
       instance.observer.watch(
         dep,
         instance.callback,
-        instance.sync ? syncWatchOptions : asyncWatchOptions
+        instance.sync ? syncWatcherOptions : asyncWatcherOptions
       )
     }
   }
