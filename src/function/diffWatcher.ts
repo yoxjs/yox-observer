@@ -1,8 +1,8 @@
-import isDef from 'yox-common/function/isDef'
-import * as array from 'yox-common/util/array'
-import * as object from 'yox-common/util/object'
-import * as string from 'yox-common/util/string'
-import * as keypathUtil from 'yox-common/util/keypath'
+import isDef from 'yox-common/src/function/isDef'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
+import * as string from 'yox-common/src/util/string'
+import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import readValue from './readValue'
 import diffRecursion from './diffRecursion'

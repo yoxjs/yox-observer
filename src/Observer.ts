@@ -1,16 +1,16 @@
-import * as is from 'yox-common/util/is'
-import * as env from 'yox-common/util/env'
-import * as array from 'yox-common/util/array'
-import * as object from 'yox-common/util/object'
-import * as string from 'yox-common/util/string'
-import * as logger from 'yox-common/util/logger'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
+import * as string from 'yox-common/src/util/string'
+import * as logger from 'yox-common/src/util/logger'
 
-import toNumber from 'yox-common/function/toNumber'
-import execute from 'yox-common/function/execute'
-import Emitter from 'yox-common/util/Emitter'
-import NextTask from 'yox-common/util/NextTask'
+import toNumber from 'yox-common/src/function/toNumber'
+import execute from 'yox-common/src/function/execute'
+import Emitter from 'yox-common/src/util/Emitter'
+import NextTask from 'yox-common/src/util/NextTask'
 
-import * as type from 'yox-type/src/type'
+import * as type from 'yox-type/index'
 import ComputedOptions from 'yox-type/src/options/Computed'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 import EmitterOptions from 'yox-type/src/options/Emitter'
@@ -98,13 +98,13 @@ export default class Observer implements ObserverInterface {
       if (target) {
         return target.get()
       }
-    }
-    if (reversedComputedKeys) {
-      const match = matchBest(reversedComputedKeys, keypath)
-      if (match && match.prop) {
-        target = computed[match.name].get()
-        if (target != env.NULL) {
-          result = object.get(target, match.prop)
+      if (reversedComputedKeys) {
+        const match = matchBest(reversedComputedKeys, keypath)
+        if (match && match.prop) {
+          target = computed[match.name].get()
+          if (target != env.NULL) {
+            result = object.get(target, match.prop)
+          }
         }
       }
     }
@@ -143,15 +143,15 @@ export default class Observer implements ObserverInterface {
         if (target) {
           target.set(newValue)
         }
-      }
-      if (reversedComputedKeys) {
-        const match = matchBest(reversedComputedKeys, keypath)
-        if (match && match.prop) {
-          target = computed[match.name]
-          if (target) {
-            const targetValue = target.get()
-            if (is.object(targetValue) || is.array(targetValue)) {
-              object.set(targetValue, match.prop, newValue)
+        if (reversedComputedKeys) {
+          const match = matchBest(reversedComputedKeys, keypath)
+          if (match && match.prop) {
+            target = computed[match.name]
+            if (target) {
+              const targetValue = target.get()
+              if (is.object(targetValue) || is.array(targetValue)) {
+                object.set(targetValue, match.prop, newValue)
+              }
             }
           }
         }

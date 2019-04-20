@@ -1,9 +1,10 @@
 {
   "name": "yox-observer",
-  "version": "0.17.13",
+  "version": "0.17.14",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {
+    "src": "src",
     "test": "test"
   },
   "repository": {
@@ -28,7 +29,7 @@
     "jest": "^24.5.0"
   },
   "dependencies": {
-    "yox-common": "^0.18.8",
-    "yox-type": "^0.0.24"
+    "yox-common": "^0.18.11",
+    "yox-type": "^0.0.28"
   }
 }

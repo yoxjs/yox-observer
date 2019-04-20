@@ -1,6 +1,6 @@
-import * as is from 'yox-common/util/is'
-import * as env from 'yox-common/util/env'
-import * as object from 'yox-common/util/object'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as object from 'yox-common/src/util/object'
 
 import WatcherOptions from 'yox-type/src/options/Watcher'
 

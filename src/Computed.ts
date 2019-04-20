@@ -1,11 +1,11 @@
-import execute from 'yox-common/function/execute'
+import execute from 'yox-common/src/function/execute'
 
-import * as is from 'yox-common/util/is'
-import * as env from 'yox-common/util/env'
-import * as array from 'yox-common/util/array'
-import * as object from 'yox-common/util/object'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
 
-import * as type from 'yox-type/src/type'
+import * as type from 'yox-type/index'
 import ComputedInterface from 'yox-type/src/Computed'
 import ObserverInterface from 'yox-type/src/Observer'
 import WatcherOptions from 'yox-type/src/options/Watcher'

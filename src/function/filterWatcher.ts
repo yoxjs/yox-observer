@@ -1,4 +1,4 @@
-import * as type from 'yox-type/src/type'
+import * as type from 'yox-type/index'
 import EmitterOptions from 'yox-type/src/options/Emitter'
 
 /**
