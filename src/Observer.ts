@@ -369,7 +369,10 @@ export default class Observer implements ObserverInterface {
           ctx: context,
           count: 0,
         }
-        emitter[options.once ? 'once' : 'on'](keypath, listener)
+        if (options.once) {
+          listener.max = 1
+        }
+        emitter.on(keypath, listener)
       }
       else {
         logger.fatal('watcher should be a function.')
@@ -409,21 +412,6 @@ export default class Observer implements ObserverInterface {
         bind(keypath, value, {})
       }
     )
-
-  }
-
-  /**
-   * 监听一次数据变化
-   */
-  watchOnce(
-    keypath: string,
-    watcher: type.watcher,
-    options?: WatcherOptions
-  ) {
-
-    const watcherOptions = formatWatcherOptions(options)
-    watcherOptions.once = env.TRUE
-    this.watch(keypath, watcher, watcherOptions)
 
   }
 
