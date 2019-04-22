@@ -91,6 +91,8 @@ export default class Computed implements ComputedInterface {
 
   callback: type.watcher
 
+  map: Record<string, boolean>
+
   private constructor(
     keypath: string,
     sync: boolean,
@@ -114,6 +116,8 @@ export default class Computed implements ComputedInterface {
     instance.getter = getter
     instance.setter = setter
 
+    instance.map = {}
+
     instance.callback = function ($0: any, $1: any, $2: string) {
 
       // 计算属性的依赖变了会走进这里
@@ -130,10 +134,11 @@ export default class Computed implements ComputedInterface {
     if (instance.fixed = !array.falsy(deps)) {
       array.each(
         deps,
-        function (dep) {
+        function (dep: string) {
           instance.add(dep)
         }
       )
+      instance.bind()
     }
 
   }
@@ -163,12 +168,17 @@ export default class Computed implements ComputedInterface {
       }
       else {
         // 清空上次收集的依赖
-        instance.clear()
+        instance.unbind()
 
         // 开始收集新的依赖
         const lastComputed = Computed.current
         Computed.current = instance
+
         instance.value = execute(getter, context)
+
+        // 绑定新的依赖
+        instance.bind()
+
         Computed.current = lastComputed
       }
 
@@ -185,52 +195,47 @@ export default class Computed implements ComputedInterface {
   }
 
   /**
-   * 计算属性是否包含依赖
-   *
-   * @param dep
-   */
-  has(dep: string): boolean {
-    return array.has(this.deps, dep)
-  }
-
-  /**
    * 添加依赖
    *
    * @param dep
    */
   add(dep: string): void {
-    const instance = this
-    if (!instance.has(dep)) {
-      array.push(instance.deps, dep)
-      instance.observer.watch(
-        dep,
-        instance.callback,
-        instance.sync ? syncWatcherOptions : asyncWatcherOptions
-      )
-    }
+    this.map[dep] = env.TRUE
   }
 
   /**
-   * 移除依赖
-   *
-   * @param dep
+   * 绑定依赖
    */
-  remove(dep: string): void {
-    const instance = this
-    if (array.remove(instance.deps, dep) > 0) {
-      instance.observer.unwatch(dep, instance.callback)
-    }
+  bind(): void {
+
+    const { map, deps, observer, callback, sync } = this
+
+    object.each(
+      map,
+      function (_: any, dep: string) {
+        array.push(deps, dep)
+        observer.watch(
+          dep,
+          callback,
+          sync ? syncWatcherOptions : asyncWatcherOptions
+        )
+      }
+    )
+
+    // 用完重置
+    this.map = {}
+
   }
 
   /**
-   * 清空依赖
+   * 解绑依赖
    */
-  clear(): void {
-    const instance = this
+  unbind(): void {
+    const { deps, observer, callback } = this
     array.each(
-      instance.deps,
-      function (dep) {
-        instance.remove(dep)
+      deps,
+      function (dep: string) {
+        observer.unwatch(dep, callback)
       },
       env.TRUE
     )
