@@ -161,7 +161,7 @@ export default class Observer implements ObserverInterface {
         object.set(data, keypath, newValue)
       }
 
-      instance.diffSync(keypath, newValue, oldValue)
+      instance.diff(keypath, newValue, oldValue)
 
     }
 
@@ -181,7 +181,7 @@ export default class Observer implements ObserverInterface {
    * @param newValue
    * @param oldValue
    */
-  diffSync(keypath: string, newValue: any, oldValue: any): void {
+  diff(keypath: string, newValue: any, oldValue: any): void {
 
     const instance = this,
 
@@ -489,7 +489,7 @@ export default class Observer implements ObserverInterface {
     let list = this.get(keypath)
     list = !is.array(list) ? [] : object.copy(list)
 
-    let { length } = list
+    const { length } = list
     if (index === env.TRUE || index === length) {
       list.push(item)
     }
@@ -539,7 +539,7 @@ export default class Observer implements ObserverInterface {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
-      && index < list[env.RAW_LENGTH]
+      && index < list.length
     ) {
       list = object.copy(list)
       list.splice(index, 1)

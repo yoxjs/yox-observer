@@ -16,7 +16,7 @@ export default function (sorted: string[], keypath: string): any {
   array.each(
     sorted,
     function (prefix: string) {
-      let length = keypathUtil.match(keypath, prefix)
+      const length = keypathUtil.match(keypath, prefix)
       if (length >= 0) {
         result = {
           name: prefix,

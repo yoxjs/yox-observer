@@ -126,7 +126,7 @@ export default class Computed implements ComputedInterface {
       newValue = instance.get(env.TRUE)
 
       if (newValue !== oldValue) {
-        observer.diffSync(keypath, newValue, oldValue)
+        observer.diff(keypath, newValue, oldValue)
       }
 
     }
@@ -223,6 +223,7 @@ export default class Computed implements ComputedInterface {
     )
 
     // 用完重置
+    // 方便下次收集依赖
     this.map = {}
 
   }
@@ -231,7 +232,9 @@ export default class Computed implements ComputedInterface {
    * 解绑依赖
    */
   unbind(): void {
+
     const { deps, observer, callback } = this
+
     array.each(
       deps,
       function (dep: string) {
@@ -239,6 +242,7 @@ export default class Computed implements ComputedInterface {
       },
       env.TRUE
     )
+
   }
 
 }
