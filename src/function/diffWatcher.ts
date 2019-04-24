@@ -8,7 +8,9 @@ import readValue from './readValue'
 import diffRecursion from './diffRecursion'
 
 export default function (
-  keypath: string, newValue: any, oldValue: any,
+  keypath: string,
+  newValue: any,
+  oldValue: any,
   watcher: Object, isRecursive: boolean,
   callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {

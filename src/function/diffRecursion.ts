@@ -7,7 +7,9 @@ import diffArray from './diffArray'
 import diffObject from './diffObject'
 
 export default function diffRecursion(
-  keypath: string, newValue: any, oldValue: any,
+  keypath: string,
+  newValue: any,
+  oldValue: any,
   watchFuzzyKeypaths: string[],
   callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
