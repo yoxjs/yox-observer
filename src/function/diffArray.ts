@@ -14,14 +14,18 @@ export default function (
   callback: (key: string | number, newValue: any, oldValue: any) => void
 ): boolean | void {
 
-  const newIsArray = is.array(newValue), oldIsArray = is.array(oldValue)
+  const newIsArray = is.array(newValue),
+
+  oldIsArray = is.array(oldValue)
+
   if (newIsArray || oldIsArray) {
 
-    const newLength = newIsArray ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
-    oldLength = oldIsArray ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
+    const newLength = newIsArray ? newValue.length : env.UNDEFINED,
+
+    oldLength = oldIsArray ? oldValue.length : env.UNDEFINED
 
     callback(
-      env.RAW_LENGTH,
+      'length',
       newLength,
       oldLength
     )

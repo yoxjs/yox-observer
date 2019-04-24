@@ -14,12 +14,15 @@ export default function (
   callback: (key: string, newValue: any, oldValue: any) => void
 ): boolean | void {
 
-  const newIsString = is.string(newValue), oldIsString = is.string(oldValue)
+  const newIsString = is.string(newValue),
+
+  oldIsString = is.string(oldValue)
+
   if (newIsString || oldIsString) {
     callback(
-      env.RAW_LENGTH,
-      newIsString ? newValue[env.RAW_LENGTH] : env.UNDEFINED,
-      oldIsString ? oldValue[env.RAW_LENGTH] : env.UNDEFINED
+      'length',
+      newIsString ? newValue.length : env.UNDEFINED,
+      oldIsString ? oldValue.length : env.UNDEFINED
     )
     return env.TRUE
   }

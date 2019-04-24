@@ -91,7 +91,7 @@ export default class Computed implements ComputedInterface {
 
   callback: type.watcher
 
-  map: Record<string, boolean>
+  unique: Record<string, boolean>
 
   private constructor(
     keypath: string,
@@ -116,7 +116,7 @@ export default class Computed implements ComputedInterface {
     instance.getter = getter
     instance.setter = setter
 
-    instance.map = {}
+    instance.unique = {}
 
     instance.callback = function ($0: any, $1: any, $2: string) {
 
@@ -197,10 +197,12 @@ export default class Computed implements ComputedInterface {
   /**
    * 添加依赖
    *
+   * 这里只是为了保证依赖唯一，最后由 bind() 实现绑定
+   *
    * @param dep
    */
   add(dep: string): void {
-    this.map[dep] = env.TRUE
+    this.unique[dep] = env.TRUE
   }
 
   /**
@@ -208,10 +210,10 @@ export default class Computed implements ComputedInterface {
    */
   bind(): void {
 
-    const { map, deps, observer, callback, sync } = this
+    const { unique, deps, observer, callback, sync } = this
 
     object.each(
-      map,
+      unique,
       function (_: any, dep: string) {
         array.push(deps, dep)
         observer.watch(
@@ -224,7 +226,7 @@ export default class Computed implements ComputedInterface {
 
     // 用完重置
     // 方便下次收集依赖
-    this.map = {}
+    this.unique = {}
 
   }
 

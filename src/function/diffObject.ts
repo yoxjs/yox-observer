@@ -15,7 +15,9 @@ export default function (
   callback: (key: string, newValue: any, oldValue: any) => void
 ) {
 
-  const newIsObject = is.object(newValue), oldIsObject = is.object(oldValue)
+  const newIsObject = is.object(newValue),
+
+  oldIsObject = is.object(oldValue)
 
   if (newIsObject || oldIsObject) {
 
