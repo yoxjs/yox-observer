@@ -245,6 +245,8 @@ export default class Computed implements ComputedInterface {
       env.TRUE
     )
 
+    deps.length = 0
+
   }
 
 }
