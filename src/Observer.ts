@@ -72,11 +72,14 @@ export default class Observer implements ObserverInterface {
    *
    * @param keypath
    * @param defaultValue
+   * @param depIgnore
    * @return
    */
-  get(keypath: string, defaultValue?: any): any {
+  get(keypath: string, defaultValue?: any, depIgnore?: boolean): any {
 
     const instance = this,
+
+    currentComputed = Computed.current,
 
     { data, computed, reversedComputedKeys } = instance
 
@@ -87,8 +90,8 @@ export default class Observer implements ObserverInterface {
 
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
-    if (Computed.current) {
-      Computed.current.add(keypath)
+    if (currentComputed && !depIgnore) {
+      currentComputed.add(keypath)
     }
 
     let result: any, target: Computed | void
@@ -101,10 +104,10 @@ export default class Observer implements ObserverInterface {
       if (reversedComputedKeys) {
         const match = matchBest(reversedComputedKeys, keypath)
         if (match && match.prop) {
-          target = computed[match.name].get()
-          if (target != env.NULL) {
-            result = object.get(target, match.prop)
-          }
+          result = object.get(
+            computed[match.name].get(),
+            match.prop
+          )
         }
       }
     }
