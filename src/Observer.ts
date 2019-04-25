@@ -394,7 +394,9 @@ export default class Observer implements ObserverInterface {
         emitter.on(keypath, listener)
       }
       else {
-        logger.fatal('watcher should be a function.')
+        if (process.env.NODE_ENV === 'dev') {
+          logger.fatal(`watcher for "${keypath}" should be a function.`)
+        }
       }
 
       if (options.immediate) {
@@ -420,7 +422,9 @@ export default class Observer implements ObserverInterface {
         )
       }
       else {
-        logger.fatal('watcher should be a function or object.')
+        if (process.env.NODE_ENV === 'dev') {
+          logger.fatal(`watcher for "${keypath}" should be a function or object.`)
+        }
       }
       return
     }

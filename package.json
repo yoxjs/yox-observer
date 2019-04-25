@@ -1,6 +1,6 @@
 {
   "name": "yox-observer",
-  "version": "0.17.23",
+  "version": "0.17.24",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {
@@ -12,7 +12,7 @@
     "url": "git+https://github.com/yoxjs/yox-observer.git"
   },
   "scripts": {
-    "test": "jest"
+    "test": "export NODE_ENV=dev && jest"
   },
   "keywords": [],
   "author": "musicode",
@@ -25,11 +25,12 @@
     "@babel/core": "^7.4.0",
     "@babel/preset-env": "^7.4.2",
     "@babel/preset-typescript": "^7.3.3",
+    "@types/node": "^11.13.7",
     "babel-jest": "^24.6.0",
     "jest": "^24.5.0"
   },
   "dependencies": {
-    "yox-common": "^0.18.22",
-    "yox-type": "^0.0.37"
+    "yox-common": "^0.18.23",
+    "yox-type": "^0.0.38"
   }
 }
