@@ -49,7 +49,7 @@ export default class Observer implements ObserverInterface {
 
   asyncEmitter: Emitter
 
-  asyncChanges: Object
+  asyncChanges: Record<string, any>
 
   pending?: boolean
 
@@ -75,7 +75,11 @@ export default class Observer implements ObserverInterface {
    * @param depIgnore
    * @return
    */
-  get(keypath: string, defaultValue?: any, depIgnore?: boolean): any {
+  get(
+    keypath: string,
+    defaultValue?: any,
+    depIgnore?: boolean
+  ): any {
 
     const instance = this,
 
@@ -126,7 +130,10 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param value
    */
-  set(keypath: string | Record<string, any>, value: any) {
+  set(
+    keypath: string | Record<string, any>,
+    value?: any
+  ) {
 
     const instance = this,
 
@@ -184,7 +191,11 @@ export default class Observer implements ObserverInterface {
    * @param newValue
    * @param oldValue
    */
-  diff(keypath: string, newValue: any, oldValue: any): void {
+  diff(
+    keypath: string,
+    newValue: any,
+    oldValue: any
+  ): void {
 
     const instance = this,
 
@@ -288,7 +299,10 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param computed
    */
-  addComputed(keypath: string, options: type.computedGetter | ComputedOptions): Computed | void {
+  addComputed(
+    keypath: string,
+    options: type.computedGetter | ComputedOptions
+  ): Computed | void {
 
     const instance = this,
     computed = Computed.build(keypath, instance, options)
@@ -313,7 +327,9 @@ export default class Observer implements ObserverInterface {
    *
    * @param keypath
    */
-  removeComputed(keypath: string): void {
+  removeComputed(
+    keypath: string
+  ): void {
 
     const instance = this,
     { computed } = instance
