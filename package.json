@@ -1,6 +1,6 @@
 {
   "name": "yox-observer",
-  "version": "0.17.24",
+  "version": "0.17.25",
   "description": "Observer for Yox.js",
   "main": "index.js",
   "directories": {
@@ -30,7 +30,7 @@
     "jest": "^24.5.0"
   },
   "dependencies": {
-    "yox-common": "^0.18.23",
-    "yox-type": "^0.0.38"
+    "yox-common": "^0.18.26",
+    "yox-type": "^0.0.40"
   }
 }
