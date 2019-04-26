@@ -20,7 +20,7 @@ export default function (
 
   if (newIsString || oldIsString) {
     callback(
-      'length',
+      env.RAW_LENGTH,
       newIsString ? newValue.length : env.UNDEFINED,
       oldIsString ? oldValue.length : env.UNDEFINED
     )

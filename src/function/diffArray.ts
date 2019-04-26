@@ -25,7 +25,7 @@ export default function (
     oldLength = oldIsArray ? oldValue.length : env.UNDEFINED
 
     callback(
-      'length',
+      env.RAW_LENGTH,
       newLength,
       oldLength
     )
