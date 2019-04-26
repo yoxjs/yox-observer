@@ -11,7 +11,7 @@ import * as env from 'yox-common/src/util/env'
 export default function (
   newValue: any,
   oldValue: any,
-  callback: (key: string | number, newValue: any, oldValue: any) => void
+  callback: (key: string, newValue: any, oldValue: any) => void
 ): boolean | void {
 
   const newIsArray = is.array(newValue),
@@ -32,7 +32,7 @@ export default function (
 
     for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
-        i,
+        `${i}`,
         newValue ? newValue[i] : env.UNDEFINED,
         oldValue ? oldValue[i] : env.UNDEFINED
       )

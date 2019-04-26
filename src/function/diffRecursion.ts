@@ -14,7 +14,7 @@ export default function diffRecursion(
   callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
 
-  const diff = function (subKeypath: string | number, subNewValue: any, subOldValue: any) {
+  const diff = function (subKeypath: string, subNewValue: any, subOldValue: any) {
 
     if (subNewValue !== subOldValue) {
 
