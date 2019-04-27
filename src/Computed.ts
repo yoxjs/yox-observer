@@ -10,10 +10,6 @@ import ComputedInterface from 'yox-type/src/Computed'
 import ObserverInterface from 'yox-type/src/Observer'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 
-const syncWatcherOptions: WatcherOptions = { sync: env.TRUE },
-
-asyncWatcherOptions: WatcherOptions = { sync: env.FALSE }
-
 /**
  * 计算属性
  *
@@ -75,8 +71,6 @@ export default class Computed implements ComputedInterface {
 
   deps: string[]
 
-  sync: boolean
-
   cache: boolean
 
   fixed: boolean
@@ -89,7 +83,9 @@ export default class Computed implements ComputedInterface {
 
   setter: type.computedSetter | void
 
-  callback: type.watcher
+  watcher: type.watcher
+
+  watcherOptions: WatcherOptions
 
   unique: Record<string, boolean>
 
@@ -106,7 +102,6 @@ export default class Computed implements ComputedInterface {
     const instance = this
 
     instance.keypath = keypath
-    instance.sync = sync
     instance.cache = cache
     // 因为可能会修改 deps，所以这里创建一个自己的对象，避免影响外部传入的 deps
     instance.deps = []
@@ -118,7 +113,7 @@ export default class Computed implements ComputedInterface {
 
     instance.unique = {}
 
-    instance.callback = function ($0: any, $1: any, $2: string) {
+    instance.watcher = function ($0: any, $1: any, $2: string) {
 
       // 计算属性的依赖变了会走进这里
 
@@ -129,6 +124,11 @@ export default class Computed implements ComputedInterface {
         observer.diff(keypath, newValue, oldValue)
       }
 
+    }
+
+    instance.watcherOptions = {
+      sync,
+      watcher: instance.watcher
     }
 
     if (instance.fixed = !array.falsy(deps)) {
@@ -167,6 +167,7 @@ export default class Computed implements ComputedInterface {
         instance.value = execute(getter, context)
       }
       else {
+
         // 清空上次收集的依赖
         instance.unbind()
 
@@ -210,7 +211,7 @@ export default class Computed implements ComputedInterface {
    */
   bind(): void {
 
-    const { unique, deps, observer, callback, sync } = this
+    const { unique, deps, observer, watcherOptions } = this
 
     object.each(
       unique,
@@ -218,8 +219,7 @@ export default class Computed implements ComputedInterface {
         array.push(deps, dep)
         observer.watch(
           dep,
-          callback,
-          sync ? syncWatcherOptions : asyncWatcherOptions
+          watcherOptions
         )
       }
     )
@@ -235,12 +235,12 @@ export default class Computed implements ComputedInterface {
    */
   unbind(): void {
 
-    const { deps, observer, callback } = this
+    const { deps, observer, watcher } = this
 
     array.each(
       deps,
       function (dep: string) {
-        observer.unwatch(dep, callback)
+        observer.unwatch(dep, watcher)
       },
       env.TRUE
     )

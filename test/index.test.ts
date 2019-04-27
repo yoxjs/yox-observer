@@ -19,9 +19,7 @@ it('watch immediate or not', () => {
     function () {
       count2 = 1
     },
-    {
-      immediate: true
-    }
+    true
   )
 
   observer.watch({
@@ -70,11 +68,11 @@ it('watch sync', done => {
 
   observer.watch(
     'name',
-    function () {
-      expect(arguments.length).toBe(3)
-      count1++
-    },
     {
+      watcher: function () {
+        expect(arguments.length).toBe(3)
+        count1++
+      },
       sync: true
     }
   )
@@ -118,10 +116,10 @@ it('watch once', done => {
 
   observer.watch(
     'name',
-    function () {
-      count++
-    },
     {
+      watcher: function () {
+        count++
+      },
       once: true
     }
   )

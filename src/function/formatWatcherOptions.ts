@@ -1,7 +1,8 @@
 import * as is from 'yox-common/src/util/is'
 import * as env from 'yox-common/src/util/env'
-import * as object from 'yox-common/src/util/object'
+import * as logger from 'yox-common/src/util/logger'
 
+import * as type from 'yox-type/index'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 
 /**
@@ -9,11 +10,21 @@ import WatcherOptions from 'yox-type/src/options/Watcher'
  *
  * @param options
  */
-export default function (options: boolean | WatcherOptions | void): WatcherOptions {
-  // 这里要返回全新的对象，避免后续的修改会影响外部传入的配置对象
-  return options === env.TRUE
-    ? { immediate: env.TRUE }
-    : is.object(options)
-      ? object.copy(options)
-      : { }
+export default function (options: type.watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
+
+  if (is.func(options)) {
+    return {
+      watcher: options as type.watcher,
+      immediate: immediate === env.TRUE,
+    }
+  }
+
+  if (options && (options as WatcherOptions).watcher) {
+    return options as WatcherOptions
+  }
+
+  if (process.env.NODE_ENV === 'dev') {
+    logger.fatal(`watcher should be a function or object.`)
+  }
+
 }

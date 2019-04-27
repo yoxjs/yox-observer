@@ -3,7 +3,6 @@ import * as env from 'yox-common/src/util/env'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 import * as string from 'yox-common/src/util/string'
-import * as logger from 'yox-common/src/util/logger'
 
 import toNumber from 'yox-common/src/function/toNumber'
 import execute from 'yox-common/src/function/execute'
@@ -346,62 +345,37 @@ export default class Observer implements ObserverInterface {
    *
    * @param keypath
    * @param watcher
-   * @param options
-   * @param options.immediate 是否立即触发一次
-   * @param options.sync 是否同步响应，默认是异步
-   * @param options.once 是否监听一次
+   * @param immediate
    */
   watch(
     keypath: string | Record<string, type.watcher | WatcherOptions>,
-    watcher?: type.watcher,
-    options?: WatcherOptions | boolean
+    watcher?: type.watcher | WatcherOptions,
+    immediate?: boolean
   ) {
 
     const instance = this,
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, watcher: any, options: WatcherOptions) {
+    bind = function (keypath: string, options: WatcherOptions) {
 
-      if (is.object(watcher)) {
+      const emitter = options.sync ? syncEmitter : asyncEmitter,
 
-        if (is.boolean(watcher.immediate)) {
-          options.immediate = watcher.immediate
-        }
-        if (is.boolean(watcher.sync)) {
-          options.sync = watcher.sync
-        }
-        if (is.boolean(watcher.once)) {
-          options.once = watcher.once
-        }
-        if (is.func(watcher.watcher)) {
-          watcher = watcher.watcher
-        }
-
+      // formatWatcherOptions 保证了 options.watcher 一定存在
+      listener: EmitterOptions = {
+        fn: options.watcher,
+        ctx: context,
+        count: 0,
       }
 
-      const emitter = options.sync ? syncEmitter : asyncEmitter
-
-      if (is.func(watcher)) {
-        const listener: EmitterOptions = {
-          fn: watcher,
-          ctx: context,
-          count: 0,
-        }
-        if (options.once) {
-          listener.max = 1
-        }
-        emitter.on(keypath, listener)
+      if (options.once) {
+        listener.max = 1
       }
-      else {
-        if (process.env.NODE_ENV === 'dev') {
-          logger.fatal(`watcher for "${keypath}" should be a function.`)
-        }
-      }
+      emitter.on(keypath, listener)
 
       if (options.immediate) {
         execute(
-          watcher,
+          options.watcher,
           context,
           [
             instance.get(keypath),
@@ -414,25 +388,17 @@ export default class Observer implements ObserverInterface {
     }
 
     if (is.string(keypath)) {
-      if (is.func(watcher) || is.object(watcher)) {
-        bind(
-          keypath as string,
-          watcher,
-          formatWatcherOptions(options)
-        )
-      }
-      else {
-        if (process.env.NODE_ENV === 'dev') {
-          logger.fatal(`watcher for "${keypath}" should be a function or object.`)
-        }
-      }
+      bind(
+        keypath as string,
+        formatWatcherOptions(watcher, immediate) as WatcherOptions
+      )
       return
     }
 
     object.each(
       keypath,
-      function (value: any, keypath: string) {
-        bind(keypath, value, {})
+      function (value: type.watcher | WatcherOptions, keypath: string) {
+        bind(keypath, formatWatcherOptions(value) as WatcherOptions)
       }
     )
 
