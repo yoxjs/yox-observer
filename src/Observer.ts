@@ -10,6 +10,7 @@ import Emitter from 'yox-common/src/util/Emitter'
 import NextTask from 'yox-common/src/util/NextTask'
 
 import * as type from 'yox-type/index'
+import ValueHolder from 'yox-type/src/ValueHolder'
 import ComputedOptions from 'yox-type/src/options/Computed'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 import EmitterOptions from 'yox-type/src/options/Emitter'
@@ -97,7 +98,7 @@ export default class Observer implements ObserverInterface {
       currentComputed.add(keypath)
     }
 
-    let result: any, target: Computed | void
+    let result: ValueHolder | void, target: Computed | void
 
     if (computed) {
       target = computed[keypath]
