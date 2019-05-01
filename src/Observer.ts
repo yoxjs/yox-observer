@@ -22,6 +22,16 @@ import diffWatcher from './function/diffWatcher'
 import filterWatcher from './function/filterWatcher'
 import formatWatcherOptions from './function/formatWatcherOptions'
 
+interface AsyncChange {
+
+  // 旧值
+  value: any
+
+  // 监听的 keypath
+  keypaths: string[]
+
+}
+
 /**
  * 观察者有两种观察模式：
  *
@@ -49,7 +59,7 @@ export default class Observer implements ObserverInterface {
 
   asyncEmitter: Emitter
 
-  asyncChanges: Record<string, any>
+  asyncChanges: Record<string, AsyncChange>
 
   pending?: boolean
 
@@ -235,14 +245,14 @@ export default class Observer implements ObserverInterface {
 
         array.each(
           asyncEmitter.listeners[watchKeypath],
-          function (item) {
-            item.count++
+          function (item: EmitterOptions) {
+            (item.count as number)++
           }
         )
 
-        const { list } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, list: [] })
-        if (!array.has(list, watchKeypath)) {
-          array.push(list, watchKeypath)
+        const { keypaths } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, keypaths: [] })
+        if (!array.has(keypaths, watchKeypath)) {
+          array.push(keypaths, watchKeypath)
         }
 
         if (!instance.pending) {
@@ -274,15 +284,15 @@ export default class Observer implements ObserverInterface {
 
     object.each(
       asyncChanges,
-      function (item, keypath) {
+      function (change: AsyncChange, keypath: string) {
 
-        const args = [instance.get(keypath), item.value, keypath]
+        const args = [instance.get(keypath), change.value, keypath]
 
         // 不能在这判断新旧值是否相同，相同就不 fire
         // 因为前面标记了 count，在这中断会导致 count 无法清除
 
         array.each(
-          item.list,
+          change.keypaths,
           function (watchKeypath: string) {
             asyncEmitter.fire(watchKeypath, args, filterWatcher)
           }
@@ -398,8 +408,8 @@ export default class Observer implements ObserverInterface {
 
     object.each(
       keypath,
-      function (value: type.watcher | WatcherOptions, keypath: string) {
-        bind(keypath, formatWatcherOptions(value) as WatcherOptions)
+      function (options: type.watcher | WatcherOptions, keypath: string) {
+        bind(keypath, formatWatcherOptions(options) as WatcherOptions)
       }
     )
 
