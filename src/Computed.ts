@@ -32,7 +32,7 @@ export default class Computed implements ComputedInterface {
 
     sync = env.TRUE,
 
-    deps = env.EMPTY_ARRAY,
+    deps: string[] = [],
 
     getter: type.computedGetter | void,
 
@@ -48,8 +48,9 @@ export default class Computed implements ComputedInterface {
       if (is.boolean(options.sync)) {
         sync = options.sync
       }
+      // 因为可能会修改 deps，所以这里创建一个新的 deps，避免影响外部传入的 deps
       if (is.array(options.deps)) {
-        deps = options.deps
+        deps = object.copy(options.deps)
       }
       if (is.func(options.get)) {
         getter = options.get
@@ -103,8 +104,8 @@ export default class Computed implements ComputedInterface {
 
     instance.keypath = keypath
     instance.cache = cache
-    // 因为可能会修改 deps，所以这里创建一个自己的对象，避免影响外部传入的 deps
-    instance.deps = []
+
+    instance.deps = deps
 
     instance.context = observer.context
     instance.observer = observer
@@ -135,10 +136,12 @@ export default class Computed implements ComputedInterface {
       array.each(
         deps,
         function (dep: string) {
-          instance.add(dep)
+          observer.watch(
+            dep,
+            instance.watcherOptions
+          )
         }
       )
-      instance.bind()
     }
 
   }

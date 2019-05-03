@@ -45,7 +45,7 @@ interface AsyncChange {
  */
 export default class Observer implements ObserverInterface {
 
-  data: Record<string, any>
+  data: type.data
 
   context: any
 
@@ -63,7 +63,7 @@ export default class Observer implements ObserverInterface {
 
   pending?: boolean
 
-  constructor(data?: Object, context?: any) {
+  constructor(data?: type.data, context?: any) {
 
     const instance = this
 
@@ -141,7 +141,7 @@ export default class Observer implements ObserverInterface {
    * @param value
    */
   set(
-    keypath: string | Record<string, any>,
+    keypath: string | type.data,
     value?: any
   ) {
 

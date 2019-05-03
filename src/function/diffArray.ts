@@ -32,7 +32,7 @@ export default function (
 
     for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
-        `${i}`,
+        '' + i,
         newValue ? newValue[i] : env.UNDEFINED,
         oldValue ? oldValue[i] : env.UNDEFINED
       )

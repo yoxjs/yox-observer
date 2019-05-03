@@ -1,4 +1,3 @@
-import * as type from 'yox-type/index'
 import EmitterOptions from 'yox-type/src/options/Emitter'
 
 /**
@@ -7,9 +6,9 @@ import EmitterOptions from 'yox-type/src/options/Emitter'
  * @param item
  * @param data
  */
-export default function (options: EmitterOptions, data: type.eventData | any[] | void): boolean | void {
+export default function (_: string, args: any[] | void, options: EmitterOptions): boolean | void {
 
-  if (options.count && data) {
+  if (options.count && args) {
 
     // 采用计数器的原因是，同一个 options 可能执行多次
     // 比如监听 user.*，如果同批次修改了 user.name 和 user.age
@@ -18,7 +17,7 @@ export default function (options: EmitterOptions, data: type.eventData | any[] |
     options.count--
 
     // 新旧值不相等
-    return data[0] !== data[1]
+    return args[0] !== args[1]
 
   }
 
