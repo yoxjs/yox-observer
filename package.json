@@ -1,8 +1,7 @@
 {
   "name": "yox-observer",
-  "version": "0.17.37",
+  "version": "0.17.38",
   "description": "Observer for Yox.js",
-  "main": "index.js",
   "directories": {
     "src": "src",
     "test": "test"
@@ -22,15 +21,11 @@
   },
   "homepage": "https://github.com/yoxjs/yox-observer#readme",
   "devDependencies": {
-    "@babel/core": "^7.4.0",
-    "@babel/preset-env": "^7.4.2",
-    "@babel/preset-typescript": "^7.3.3",
     "@types/node": "^11.13.7",
-    "babel-jest": "^24.6.0",
     "jest": "^24.5.0"
   },
   "dependencies": {
-    "yox-common": "^0.18.43",
-    "yox-type": "^0.0.59"
+    "yox-common": "^0.18.45",
+    "yox-type": "^0.0.62"
   }
 }

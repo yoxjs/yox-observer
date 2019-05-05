@@ -2,7 +2,7 @@ import * as is from 'yox-common/src/util/is'
 import * as env from 'yox-common/src/util/env'
 import * as logger from 'yox-common/src/util/logger'
 
-import * as type from 'yox-type/index'
+import * as type from 'yox-type/src/type'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 
 // 避免频繁创建对象

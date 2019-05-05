@@ -5,9 +5,9 @@ import * as env from 'yox-common/src/util/env'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 
-import * as type from 'yox-type/index'
-import ComputedInterface from 'yox-type/src/Computed'
-import ObserverInterface from 'yox-type/src/Observer'
+import * as type from 'yox-type/src/type'
+import ComputedInterface from 'yox-type/src/watcher/Computed'
+import ObserverInterface from 'yox-type/src/watcher/Observer'
 import WatcherOptions from 'yox-type/src/options/Watcher'
 
 /**
