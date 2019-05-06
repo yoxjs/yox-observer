@@ -5,4 +5,5 @@ dist
 .npmignore
 package-lock.json
 yarn.lock
+tsconfig.tsbuildinfo
 jest.config.js
