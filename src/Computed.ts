@@ -151,7 +151,7 @@ export default class Computed implements ComputedInterface {
    *
    * @param force 是否强制刷新缓存
    */
-  get(force?: boolean): any {
+  get(force?: true): any {
 
     const instance = this,
 

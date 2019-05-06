@@ -88,7 +88,7 @@ export default class Observer implements ObserverInterface {
   get(
     keypath: string,
     defaultValue?: any,
-    depIgnore?: boolean
+    depIgnore?: true
   ): any {
 
     const instance = this,
@@ -361,7 +361,7 @@ export default class Observer implements ObserverInterface {
   watch(
     keypath: string | Record<string, type.watcher | WatcherOptions>,
     watcher?: type.watcher | WatcherOptions,
-    immediate?: boolean
+    immediate?: true
   ) {
 
     const instance = this,
@@ -382,6 +382,7 @@ export default class Observer implements ObserverInterface {
       if (options.once) {
         listener.max = 1
       }
+
       emitter.on(keypath, listener)
 
       if (options.immediate) {
@@ -484,7 +485,7 @@ export default class Observer implements ObserverInterface {
    * @param item
    * @param index
    */
-  insert(keypath: string, item: any, index: number | boolean): boolean | void {
+  insert(keypath: string, item: any, index: number | boolean): true | void {
 
     let list = this.get(keypath)
     list = !is.array(list) ? [] : object.copy(list)
@@ -515,7 +516,7 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param item
    */
-  append(keypath: string, item: any): boolean | void {
+  append(keypath: string, item: any): true | void {
     return this.insert(keypath, item, env.TRUE)
   }
 
@@ -525,7 +526,7 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param item
    */
-  prepend(keypath: string, item: any): boolean | void {
+  prepend(keypath: string, item: any): true | void {
     return this.insert(keypath, item, env.FALSE)
   }
 
@@ -535,7 +536,7 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param index
    */
-  removeAt(keypath: string, index: number): boolean | void {
+  removeAt(keypath: string, index: number): true | void {
     let list = this.get(keypath)
     if (is.array(list)
       && index >= 0
@@ -554,7 +555,7 @@ export default class Observer implements ObserverInterface {
    * @param keypath
    * @param item
    */
-  remove(keypath: string, item: any): boolean | void {
+  remove(keypath: string, item: any): true | void {
     let list = this.get(keypath)
     if (is.array(list)) {
       list = object.copy(list)
