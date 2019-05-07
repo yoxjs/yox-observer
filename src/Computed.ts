@@ -34,9 +34,9 @@ export default class Computed implements ComputedInterface {
 
     deps: string[] = [],
 
-    getter: type.computedGetter | void,
+    getter: type.getter | void,
 
-    setter: type.computedSetter | void
+    setter: type.setter | void
 
     if (is.func(options)) {
       getter = options
@@ -80,9 +80,9 @@ export default class Computed implements ComputedInterface {
 
   observer: ObserverInterface
 
-  getter: type.computedGetter
+  getter: type.getter
 
-  setter: type.computedSetter | void
+  setter: type.setter | void
 
   watcher: type.watcher
 
@@ -96,8 +96,8 @@ export default class Computed implements ComputedInterface {
     cache: boolean,
     deps: string[],
     observer: ObserverInterface,
-    getter: type.computedGetter,
-    setter: type.computedSetter | void
+    getter: type.getter,
+    setter: type.setter | void
   ) {
 
     const instance = this

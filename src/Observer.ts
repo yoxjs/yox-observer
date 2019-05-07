@@ -311,7 +311,7 @@ export default class Observer implements ObserverInterface {
    */
   addComputed(
     keypath: string,
-    options: type.computedGetter | ComputedOptions
+    options: type.getter | ComputedOptions
   ): Computed | void {
 
     const instance = this,
