@@ -1,6 +1,6 @@
-import isDef from '../../../yox-common/src/function/isDef'
-import * as array from '../../../yox-common/src/util/array'
-import * as keypathUtil from '../../../yox-common/src/util/keypath'
+import isDef from 'yox-common/src/function/isDef'
+import * as array from 'yox-common/src/util/array'
+import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import diffString from './diffString'
 import diffArray from './diffArray'

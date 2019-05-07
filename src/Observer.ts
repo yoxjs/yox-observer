@@ -1,20 +1,20 @@
-import * as is from '../../yox-common/src/util/is'
-import * as env from '../../yox-common/src/util/env'
-import * as array from '../../yox-common/src/util/array'
-import * as object from '../../yox-common/src/util/object'
-import * as string from '../../yox-common/src/util/string'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
+import * as string from 'yox-common/src/util/string'
 
-import toNumber from '../../yox-common/src/function/toNumber'
-import execute from '../../yox-common/src/function/execute'
-import Emitter from '../../yox-common/src/util/Emitter'
-import NextTask from '../../yox-common/src/util/NextTask'
+import toNumber from 'yox-common/src/function/toNumber'
+import execute from 'yox-common/src/function/execute'
+import Emitter from 'yox-common/src/util/Emitter'
+import NextTask from 'yox-common/src/util/NextTask'
 
-import * as type from '../../yox-type/src/type'
-import ValueHolder from '../../yox-type/src/interface/ValueHolder'
-import ComputedOptions from '../../yox-type/src/options/Computed'
-import WatcherOptions from '../../yox-type/src/options/Watcher'
-import EmitterOptions from '../../yox-type/src/options/Emitter'
-import ObserverInterface from '../../yox-type/src/watcher/Observer'
+import * as type from 'yox-type/src/type'
+import ValueHolder from 'yox-type/src/interface/ValueHolder'
+import ComputedOptions from 'yox-type/src/options/Computed'
+import WatcherOptions from 'yox-type/src/options/Watcher'
+import EmitterOptions from 'yox-type/src/options/Emitter'
+import ObserverInterface from 'yox-type/src/watcher/Observer'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'
@@ -88,7 +88,7 @@ export default class Observer implements ObserverInterface {
   get(
     keypath: string,
     defaultValue?: any,
-    depIgnore?: true
+    depIgnore?: boolean
   ): any {
 
     const instance = this,
@@ -169,7 +169,7 @@ export default class Observer implements ObserverInterface {
             target = computed[match.name]
             if (target) {
               const targetValue = target.get()
-              if (is.object(targetValue) || is.array(targetValue)) {
+              if (is.object(targetValue)) {
                 object.set(targetValue, match.prop, newValue)
               }
             }
@@ -315,6 +315,7 @@ export default class Observer implements ObserverInterface {
   ): Computed | void {
 
     const instance = this,
+
     computed = Computed.build(keypath, instance, options)
 
     if (computed) {
@@ -342,6 +343,7 @@ export default class Observer implements ObserverInterface {
   ): void {
 
     const instance = this,
+
     { computed } = instance
 
     if (computed && object.has(computed, keypath)) {
@@ -361,7 +363,7 @@ export default class Observer implements ObserverInterface {
   watch(
     keypath: string | Record<string, type.watcher | WatcherOptions>,
     watcher?: type.watcher | WatcherOptions,
-    immediate?: true
+    immediate?: boolean
   ) {
 
     const instance = this,
@@ -423,7 +425,7 @@ export default class Observer implements ObserverInterface {
    * @param watcher
    */
   unwatch(
-    keypath: string,
+    keypath?: string,
     watcher?: type.watcher
   ) {
     this.syncEmitter.off(keypath, watcher)

@@ -1,5 +1,5 @@
-import * as is from '../../../yox-common/src/util/is'
-import * as env from '../../../yox-common/src/util/env'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
 
 /**
  * 对比新旧数组
@@ -12,7 +12,7 @@ export default function (
   newValue: any,
   oldValue: any,
   callback: (key: string, newValue: any, oldValue: any) => void
-): boolean | void {
+): true | void {
 
   const newIsArray = is.array(newValue),
 
