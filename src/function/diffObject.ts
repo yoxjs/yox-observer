@@ -1,6 +1,6 @@
-import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
-import * as object from 'yox-common/src/util/object'
+import * as is from '../../../yox-common/src/util/is'
+import * as env from '../../../yox-common/src/util/env'
+import * as object from '../../../yox-common/src/util/object'
 
 /**
  * 对比新旧对象

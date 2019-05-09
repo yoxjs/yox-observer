@@ -1,5 +1,5 @@
-import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
+import * as is from '../../../yox-common/src/util/is'
+import * as env from '../../../yox-common/src/util/env'
 
 /**
  * 对比新旧数组
