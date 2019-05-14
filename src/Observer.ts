@@ -569,6 +569,29 @@ export default class Observer implements ObserverInterface {
   }
 
   /**
+   * 删除旧元素并插入新元素
+   *
+   * @param keypath
+   * @param index
+   * @param count
+   * @param items
+   */
+  splice(keypath: string, index: number, count: number, ...items: any[]): true | void {
+    let list = this.get(keypath)
+    if (is.array(list)) {
+      list = object.copy(list)
+
+      array.unshift(items, count)
+      array.unshift(items, index)
+
+      execute(list.splice, list, items)
+
+      this.set(keypath, list)
+      return env.TRUE
+    }
+  }
+
+  /**
    * 拷贝任意数据，支持深拷贝
    *
    * @param data
