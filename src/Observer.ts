@@ -539,16 +539,7 @@ export default class Observer implements ObserverInterface {
    * @param index
    */
   removeAt(keypath: string, index: number): true | void {
-    let list = this.get(keypath)
-    if (is.array(list)
-      && index >= 0
-      && index < list.length
-    ) {
-      list = object.copy(list)
-      list.splice(index, 1)
-      this.set(keypath, list)
-      return env.TRUE
-    }
+    return this.splice(keypath, index, 1)
   }
 
   /**
