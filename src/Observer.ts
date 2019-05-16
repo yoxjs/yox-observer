@@ -189,7 +189,7 @@ export default class Observer implements ObserverInterface {
       setValue(value, keypath as string)
     }
     else if (is.object(keypath)) {
-      object.each(keypath, setValue)
+      object.each(keypath as type.data, setValue)
     }
 
   }
@@ -410,7 +410,7 @@ export default class Observer implements ObserverInterface {
     }
 
     object.each(
-      keypath,
+      keypath as type.data,
       function (options: type.watcher | WatcherOptions, keypath: string) {
         bind(keypath, formatWatcherOptions(options) as WatcherOptions)
       }
