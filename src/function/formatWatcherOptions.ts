@@ -27,7 +27,7 @@ export default function (options: type.watcher | WatcherOptions | void, immediat
     return options as WatcherOptions
   }
 
-  if (process.env.NODE_ENV === 'dev') {
+  if (process.env.NODE_ENV === 'development') {
     logger.fatal(`watcher should be a function or object.`)
   }
 
