@@ -1,14 +1,14 @@
-import execute from '../../yox-common/src/function/execute'
+import execute from 'yox-common/src/function/execute'
 
-import * as is from '../../yox-common/src/util/is'
-import * as env from '../../yox-common/src/util/env'
-import * as array from '../../yox-common/src/util/array'
-import * as object from '../../yox-common/src/util/object'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
 
-import * as type from '../../yox-type/src/type'
-import ComputedInterface from '../../yox-type/src/watcher/Computed'
-import ObserverInterface from '../../yox-type/src/watcher/Observer'
-import WatcherOptions from '../../yox-type/src/options/Watcher'
+import * as type from 'yox-type/src/type'
+import ComputedInterface from 'yox-type/src/watcher/Computed'
+import ObserverInterface from 'yox-type/src/watcher/Observer'
+import WatcherOptions from 'yox-type/src/options/Watcher'
 
 /**
  * 计算属性
