@@ -10,11 +10,14 @@ import Emitter from '../../yox-common/src/util/Emitter'
 import NextTask from '../../yox-common/src/util/NextTask'
 
 import * as type from '../../yox-type/src/type'
-import ValueHolder from '../../yox-type/src/interface/ValueHolder'
-import ComputedOptions from '../../yox-type/src/options/Computed'
-import WatcherOptions from '../../yox-type/src/options/Watcher'
-import EmitterOptions from '../../yox-type/src/options/Emitter'
-import ObserverInterface from '../../yox-type/src/watcher/Observer'
+
+import {
+  ValueHolder,
+  ComputedOptions,
+  WatcherOptions,
+  EmitterOptions,
+  Observer as ObserverInterface
+} from '../../yox-type/src/class'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'
