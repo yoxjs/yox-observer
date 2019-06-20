@@ -1,17 +1,18 @@
+import {
+  getter,
+  setter,
+  watcher,
+  WatcherOptions,
+  Computed as ComputedInterface,
+  Observer as ObserverInterface
+} from '../../yox-type/src/type'
+
 import execute from '../../yox-common/src/function/execute'
 
 import * as is from '../../yox-common/src/util/is'
 import * as env from '../../yox-common/src/util/env'
 import * as array from '../../yox-common/src/util/array'
 import * as object from '../../yox-common/src/util/object'
-
-import * as type from '../../yox-type/src/type'
-
-import {
-  WatcherOptions,
-  Computed as ComputedInterface,
-  Observer as ObserverInterface
-} from '../../yox-type/src/class'
 
 /**
  * 计算属性
@@ -37,9 +38,9 @@ export default class Computed implements ComputedInterface {
 
     deps: string[] = [],
 
-    getter: type.getter | void,
+    getter: getter | void,
 
-    setter: type.setter | void
+    setter: setter | void
 
     if (is.func(options)) {
       getter = options
@@ -83,11 +84,11 @@ export default class Computed implements ComputedInterface {
 
   observer: ObserverInterface
 
-  getter: type.getter
+  getter: getter
 
-  setter: type.setter | void
+  setter: setter | void
 
-  watcher: type.watcher
+  watcher: watcher
 
   watcherOptions: WatcherOptions
 
@@ -99,8 +100,8 @@ export default class Computed implements ComputedInterface {
     cache: boolean,
     deps: string[],
     observer: ObserverInterface,
-    getter: type.getter,
-    setter: type.setter | void
+    getter: getter,
+    setter: setter | void
   ) {
 
     const instance = this

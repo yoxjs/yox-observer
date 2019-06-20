@@ -1,3 +1,14 @@
+import {
+  data,
+  getter,
+  watcher,
+  valueHolder,
+  ComputedOptions,
+  WatcherOptions,
+  EmitterOptions,
+  Observer as ObserverInterface
+} from '../../yox-type/src/type'
+
 import * as is from '../../yox-common/src/util/is'
 import * as env from '../../yox-common/src/util/env'
 import * as array from '../../yox-common/src/util/array'
@@ -8,16 +19,6 @@ import toNumber from '../../yox-common/src/function/toNumber'
 import execute from '../../yox-common/src/function/execute'
 import Emitter from '../../yox-common/src/util/Emitter'
 import NextTask from '../../yox-common/src/util/NextTask'
-
-import * as type from '../../yox-type/src/type'
-
-import {
-  ValueHolder,
-  ComputedOptions,
-  WatcherOptions,
-  EmitterOptions,
-  Observer as ObserverInterface
-} from '../../yox-type/src/class'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'
@@ -48,7 +49,7 @@ interface AsyncChange {
  */
 export default class Observer implements ObserverInterface {
 
-  data: type.data
+  data: data
 
   context: any
 
@@ -66,7 +67,7 @@ export default class Observer implements ObserverInterface {
 
   pending?: boolean
 
-  constructor(data?: type.data, context?: any) {
+  constructor(data?: data, context?: any) {
 
     const instance = this
 
@@ -111,7 +112,7 @@ export default class Observer implements ObserverInterface {
       currentComputed.add(keypath)
     }
 
-    let result: ValueHolder | void, target: Computed | void
+    let result: valueHolder | void, target: Computed | void
 
     if (computed) {
       target = computed[keypath]
@@ -144,7 +145,7 @@ export default class Observer implements ObserverInterface {
    * @param value
    */
   set(
-    keypath: string | type.data,
+    keypath: string | data,
     value?: any
   ) {
 
@@ -192,7 +193,7 @@ export default class Observer implements ObserverInterface {
       setValue(value, keypath as string)
     }
     else if (is.object(keypath)) {
-      object.each(keypath as type.data, setValue)
+      object.each(keypath as data, setValue)
     }
 
   }
@@ -314,7 +315,7 @@ export default class Observer implements ObserverInterface {
    */
   addComputed(
     keypath: string,
-    options: type.getter | ComputedOptions
+    options: getter | ComputedOptions
   ): Computed | void {
 
     const instance = this,
@@ -364,8 +365,8 @@ export default class Observer implements ObserverInterface {
    * @param immediate
    */
   watch(
-    keypath: string | Record<string, type.watcher | WatcherOptions>,
-    watcher?: type.watcher | WatcherOptions,
+    keypath: string | Record<string, watcher | WatcherOptions>,
+    watcher?: watcher | WatcherOptions,
     immediate?: boolean
   ) {
 
@@ -413,8 +414,8 @@ export default class Observer implements ObserverInterface {
     }
 
     object.each(
-      keypath as type.data,
-      function (options: type.watcher | WatcherOptions, keypath: string) {
+      keypath as data,
+      function (options: watcher | WatcherOptions, keypath: string) {
         bind(keypath, formatWatcherOptions(options) as WatcherOptions)
       }
     )
@@ -429,7 +430,7 @@ export default class Observer implements ObserverInterface {
    */
   unwatch(
     keypath?: string,
-    watcher?: type.watcher
+    watcher?: watcher
   ) {
     this.syncEmitter.off(keypath, watcher)
     this.asyncEmitter.off(keypath, watcher)
