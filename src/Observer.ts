@@ -2,7 +2,7 @@ import {
   data,
   getter,
   watcher,
-  valueHolder,
+  ValueHolder,
   ComputedOptions,
   WatcherOptions,
   EmitterOptions,
@@ -112,7 +112,7 @@ export default class Observer implements ObserverInterface {
       currentComputed.add(keypath)
     }
 
-    let result: valueHolder | void, target: Computed | void
+    let result: ValueHolder | void, target: Computed | void
 
     if (computed) {
       target = computed[keypath]
