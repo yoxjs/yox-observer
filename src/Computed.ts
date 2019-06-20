@@ -2,10 +2,13 @@ import {
   getter,
   setter,
   watcher,
-  WatcherOptions,
   Computed as ComputedInterface,
   Observer as ObserverInterface
 } from '../../yox-type/src/type'
+
+import {
+  WatcherOptions
+} from '../../yox-type/src/global'
 
 import execute from '../../yox-common/src/function/execute'
 

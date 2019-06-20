@@ -1,9 +1,14 @@
+import {
+  watcher,
+} from '../../../yox-type/src/type'
+
+import {
+  WatcherOptions,
+} from '../../../yox-type/src/global'
+
 import * as is from '../../../yox-common/src/util/is'
 import * as env from '../../../yox-common/src/util/env'
 import * as logger from '../../../yox-common/src/util/logger'
-
-import * as type from '../../../yox-type/src/type'
-import { WatcherOptions } from '../../../yox-type/src/type'
 
 // 避免频繁创建对象
 const optionsHolder: WatcherOptions = {
@@ -15,10 +20,10 @@ const optionsHolder: WatcherOptions = {
  *
  * @param options
  */
-export default function (options: type.watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
+export default function (options: watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
 
   if (is.func(options)) {
-    optionsHolder.watcher = options as type.watcher
+    optionsHolder.watcher = options as watcher
     optionsHolder.immediate = immediate === env.TRUE
     return optionsHolder
   }
