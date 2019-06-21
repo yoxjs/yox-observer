@@ -2,6 +2,10 @@ import {
   watcher,
 } from '../../../yox-type/src/type'
 
+import {
+  WatcherOptions,
+} from '../../../yox-type/src/global'
+
 import * as is from '../../../yox-common/src/util/is'
 import * as env from '../../../yox-common/src/util/env'
 import * as logger from '../../../yox-common/src/util/logger'

@@ -6,6 +6,10 @@ import {
   ObserverInterface,
 } from '../../yox-type/src/type'
 
+import {
+  WatcherOptions,
+} from '../../yox-type/src/global'
+
 import execute from '../../yox-common/src/function/execute'
 
 import * as is from '../../yox-common/src/util/is'

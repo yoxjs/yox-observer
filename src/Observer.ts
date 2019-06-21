@@ -7,6 +7,11 @@ import {
   ObserverInterface,
 } from '../../yox-type/src/type'
 
+import {
+  WatcherOptions,
+  ComputedOptions,
+} from '../../yox-type/src/global'
+
 import * as is from '../../yox-common/src/util/is'
 import * as env from '../../yox-common/src/util/env'
 import * as array from '../../yox-common/src/util/array'
