@@ -1,12 +1,12 @@
 import {
   getter,
   setter,
-  watcher,
   ComputedInterface,
   ObserverInterface,
 } from '../../yox-type/src/type'
 
 import {
+  watcher,
   WatcherOptions,
 } from '../../yox-type/src/global'
 

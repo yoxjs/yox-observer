@@ -1,15 +1,15 @@
 import {
   data,
   getter,
-  watcher,
   ValueHolder,
-  EmitterOptions,
   ObserverInterface,
 } from '../../yox-type/src/type'
 
 import {
+  watcher,
   WatcherOptions,
   ComputedOptions,
+  EmitterOptions,
 } from '../../yox-type/src/global'
 
 import * as is from '../../yox-common/src/util/is'

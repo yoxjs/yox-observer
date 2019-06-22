@@ -1,8 +1,5 @@
 import {
   watcher,
-} from '../../../yox-type/src/type'
-
-import {
   WatcherOptions,
 } from '../../../yox-type/src/global'
 
