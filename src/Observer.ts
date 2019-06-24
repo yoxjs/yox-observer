@@ -1,6 +1,6 @@
 import {
   data,
-  getter,
+  computedGetter,
   ValueHolder,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -318,7 +318,7 @@ export default class Observer implements ObserverInterface {
    */
   addComputed(
     keypath: string,
-    options: getter | ComputedOptions
+    options: computedGetter | ComputedOptions
   ): Computed | void {
 
     const instance = this,

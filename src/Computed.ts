@@ -1,6 +1,6 @@
 import {
-  getter,
-  setter,
+  computedGetter,
+  computedSetter,
   ComputedInterface,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -41,9 +41,9 @@ export default class Computed implements ComputedInterface {
 
     deps: string[] = [],
 
-    getter: getter | void,
+    getter: computedGetter | void,
 
-    setter: setter | void
+    setter: computedSetter | void
 
     if (is.func(options)) {
       getter = options
@@ -87,9 +87,9 @@ export default class Computed implements ComputedInterface {
 
   observer: ObserverInterface
 
-  getter: getter
+  getter: computedGetter
 
-  setter: setter | void
+  setter: computedSetter | void
 
   watcher: watcher
 
@@ -103,8 +103,8 @@ export default class Computed implements ComputedInterface {
     cache: boolean,
     deps: string[],
     observer: ObserverInterface,
-    getter: getter,
-    setter: setter | void
+    getter: computedGetter,
+    setter: computedSetter | void
   ) {
 
     const instance = this
