@@ -12,7 +12,6 @@ import {
 
 import execute from '../../yox-common/src/function/execute'
 
-import * as is from '../../yox-common/src/util/is'
 import * as env from '../../yox-common/src/util/env'
 import * as array from '../../yox-common/src/util/array'
 import * as object from '../../yox-common/src/util/object'
@@ -25,53 +24,6 @@ import * as object from '../../yox-common/src/util/object'
 export default class Computed implements ComputedInterface {
 
   static current?: Computed
-
-  /**
-   * 对外的构造器，把用户配置的计算属性对象转换成内部对象
-   *
-   * @param keypath
-   * @param observer
-   * @param options
-   */
-  static build(keypath: string, observer: ObserverInterface, options: any): Computed | void {
-
-    let cache = env.TRUE,
-
-    sync = env.TRUE,
-
-    deps: string[] = [],
-
-    getter: computedGetter | void,
-
-    setter: computedSetter | void
-
-    if (is.func(options)) {
-      getter = options
-    }
-    else if (is.object(options)) {
-      if (is.boolean(options.cache)) {
-        cache = options.cache
-      }
-      if (is.boolean(options.sync)) {
-        sync = options.sync
-      }
-      // 因为可能会修改 deps，所以这里创建一个新的 deps，避免影响外部传入的 deps
-      if (is.array(options.deps)) {
-        deps = object.copy(options.deps)
-      }
-      if (is.func(options.get)) {
-        getter = options.get
-      }
-      if (is.func(options.set)) {
-        setter = options.set
-      }
-    }
-
-    if (getter) {
-      return new Computed(keypath, sync, cache, deps, observer, getter, setter)
-    }
-
-  }
 
   keypath: string
 
@@ -97,7 +49,7 @@ export default class Computed implements ComputedInterface {
 
   unique: Record<string, boolean>
 
-  private constructor(
+  constructor(
     keypath: string,
     sync: boolean,
     cache: boolean,

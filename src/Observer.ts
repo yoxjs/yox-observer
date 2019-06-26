@@ -1,6 +1,7 @@
 import {
   data,
   computedGetter,
+  computedSetter,
   ValueHolder,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -321,11 +322,44 @@ export default class Observer implements ObserverInterface {
     options: computedGetter | ComputedOptions
   ): Computed | void {
 
-    const instance = this,
+    let cache = env.TRUE,
 
-    computed = Computed.build(keypath, instance, options)
+    sync = env.TRUE,
 
-    if (computed) {
+    deps: string[] = [],
+
+    getter: computedGetter | void,
+
+    setter: computedSetter | void
+
+    if (is.func(options)) {
+      getter = options as computedGetter
+    }
+    else if (is.object(options)) {
+      const computedOptions = options as ComputedOptions
+      if (is.boolean(computedOptions.cache)) {
+        cache = computedOptions.cache as boolean
+      }
+      if (is.boolean(computedOptions.sync)) {
+        sync = computedOptions.sync as boolean
+      }
+      // 因为可能会修改 deps，所以这里创建一个新的 deps，避免影响外部传入的 deps
+      if (is.array(computedOptions.deps)) {
+        deps = object.copy(computedOptions.deps)
+      }
+      if (is.func(computedOptions.get)) {
+        getter = computedOptions.get
+      }
+      if (is.func(computedOptions.set)) {
+        setter = computedOptions.set
+      }
+    }
+
+    if (getter) {
+
+      const instance = this,
+
+      computed = new Computed(keypath, sync, cache, deps, instance, getter, setter)
 
       if (!instance.computed) {
         instance.computed = {}
