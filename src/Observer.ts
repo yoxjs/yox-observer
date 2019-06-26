@@ -63,9 +63,9 @@ export default class Observer<T> implements ObserverInterface<T> {
 
   reversedComputedKeys?: string[]
 
-  syncEmitter: Emitter
+  syncEmitter: Emitter<T>
 
-  asyncEmitter: Emitter
+  asyncEmitter: Emitter<T>
 
   asyncChanges: Record<string, AsyncChange>
 
