@@ -6,7 +6,7 @@ import {
 } from '../../yox-type/src/type'
 
 import {
-  watcher,
+  Watcher,
   WatcherOptions,
   ComputedOptions,
   EmitterOptions,
@@ -368,8 +368,8 @@ export default class Observer implements ObserverInterface {
    * @param immediate
    */
   watch(
-    keypath: string | Record<string, watcher | WatcherOptions>,
-    watcher?: watcher | WatcherOptions,
+    keypath: string | Record<string, Watcher | WatcherOptions>,
+    watcher?: Watcher | WatcherOptions,
     immediate?: boolean
   ) {
 
@@ -418,7 +418,7 @@ export default class Observer implements ObserverInterface {
 
     object.each(
       keypath as data,
-      function (options: watcher | WatcherOptions, keypath: string) {
+      function (options: Watcher | WatcherOptions, keypath: string) {
         bind(keypath, formatWatcherOptions(options) as WatcherOptions)
       }
     )
@@ -433,7 +433,7 @@ export default class Observer implements ObserverInterface {
    */
   unwatch(
     keypath?: string,
-    watcher?: watcher
+    watcher?: Watcher
   ) {
     this.syncEmitter.off(keypath, watcher)
     this.asyncEmitter.off(keypath, watcher)

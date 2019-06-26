@@ -6,7 +6,7 @@ import {
 } from '../../yox-type/src/type'
 
 import {
-  watcher,
+  Watcher,
   WatcherOptions,
 } from '../../yox-type/src/global'
 
@@ -91,7 +91,7 @@ export default class Computed implements ComputedInterface {
 
   setter: computedSetter | void
 
-  watcher: watcher
+  watcher: Watcher
 
   watcherOptions: WatcherOptions
 

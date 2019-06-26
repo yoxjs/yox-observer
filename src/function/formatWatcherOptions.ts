@@ -1,5 +1,5 @@
 import {
-  watcher,
+  Watcher,
   WatcherOptions,
 } from '../../../yox-type/src/global'
 
@@ -17,10 +17,10 @@ const optionsHolder: WatcherOptions = {
  *
  * @param options
  */
-export default function (options: watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
+export default function (options: Watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
 
   if (is.func(options)) {
-    optionsHolder.watcher = options as watcher
+    optionsHolder.watcher = options as Watcher
     optionsHolder.immediate = immediate === env.TRUE
     return optionsHolder
   }
