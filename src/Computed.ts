@@ -43,9 +43,9 @@ export default class Computed<T> implements ComputedInterface<T> {
 
   setter: computedSetter | void
 
-  watcher: Watcher
+  watcher: Watcher<T>
 
-  watcherOptions: WatcherOptions
+  watcherOptions: WatcherOptions<T>
 
   unique: Record<string, boolean>
 

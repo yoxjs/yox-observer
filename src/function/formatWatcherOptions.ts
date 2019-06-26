@@ -8,7 +8,7 @@ import * as env from '../../../yox-common/src/util/env'
 import * as logger from '../../../yox-common/src/util/logger'
 
 // 避免频繁创建对象
-const optionsHolder: WatcherOptions = {
+const optionsHolder: WatcherOptions<any> = {
   watcher: env.EMPTY_FUNCTION
 }
 
@@ -17,16 +17,16 @@ const optionsHolder: WatcherOptions = {
  *
  * @param options
  */
-export default function (options: Watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
+export default function<T> (options: Watcher<T> | WatcherOptions<T> | void, immediate: boolean | void): WatcherOptions<T> | void {
 
   if (is.func(options)) {
-    optionsHolder.watcher = options as Watcher
+    optionsHolder.watcher = options as Watcher<T>
     optionsHolder.immediate = immediate === env.TRUE
     return optionsHolder
   }
 
-  if (options && (options as WatcherOptions).watcher) {
-    return options as WatcherOptions
+  if (options && (options as WatcherOptions<T>).watcher) {
+    return options as WatcherOptions<T>
   }
 
   if (process.env.NODE_ENV === 'development') {

@@ -402,8 +402,8 @@ export default class Observer<T> implements ObserverInterface<T> {
    * @param immediate
    */
   watch(
-    keypath: string | Record<string, Watcher | WatcherOptions>,
-    watcher?: Watcher | WatcherOptions,
+    keypath: string | Record<string, Watcher<T> | WatcherOptions<T>>,
+    watcher?: Watcher<T> | WatcherOptions<T>,
     immediate?: boolean
   ) {
 
@@ -411,7 +411,7 @@ export default class Observer<T> implements ObserverInterface<T> {
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, options: WatcherOptions) {
+    bind = function (keypath: string, options: WatcherOptions<T>) {
 
       const emitter = options.sync ? syncEmitter : asyncEmitter,
 
@@ -445,15 +445,15 @@ export default class Observer<T> implements ObserverInterface<T> {
     if (is.string(keypath)) {
       bind(
         keypath as string,
-        formatWatcherOptions(watcher, immediate) as WatcherOptions
+        formatWatcherOptions(watcher, immediate) as WatcherOptions<T>
       )
       return
     }
 
     object.each(
       keypath as data,
-      function (options: Watcher | WatcherOptions, keypath: string) {
-        bind(keypath, formatWatcherOptions(options) as WatcherOptions)
+      function (options: Watcher<T> | WatcherOptions<T>, keypath: string) {
+        bind(keypath, formatWatcherOptions(options) as WatcherOptions<T>)
       }
     )
 
@@ -467,7 +467,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    */
   unwatch(
     keypath?: string,
-    watcher?: Watcher
+    watcher?: Watcher<T>
   ) {
     this.syncEmitter.off(keypath, watcher)
     this.asyncEmitter.off(keypath, watcher)
