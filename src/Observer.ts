@@ -51,15 +51,15 @@ interface AsyncChange {
  *
  * 对于外部调用 observer.watch('keypath', listener)，属于异步监听，它只关心是否变了，而不关心是否是立即触发的
  */
-export default class Observer implements ObserverInterface {
+export default class Observer<T> implements ObserverInterface<T> {
 
   data: data
 
-  context: any
+  context: T
 
   nextTask: NextTask
 
-  computed?: Record<string, Computed>
+  computed?: Record<string, Computed<T>>
 
   reversedComputedKeys?: string[]
 
@@ -116,7 +116,7 @@ export default class Observer implements ObserverInterface {
       currentComputed.add(keypath)
     }
 
-    let result: ValueHolder | void, target: Computed | void
+    let result: ValueHolder | void, target: Computed<T> | void
 
     if (computed) {
       target = computed[keypath]
@@ -164,7 +164,7 @@ export default class Observer implements ObserverInterface {
         return
       }
 
-      let target: Computed | void
+      let target: Computed<T> | void
 
       if (computed) {
         target = computed[keypath]
@@ -320,7 +320,7 @@ export default class Observer implements ObserverInterface {
   addComputed(
     keypath: string,
     options: computedGetter | ComputedOptions
-  ): Computed | void {
+  ): Computed<T> | void {
 
     let cache = env.TRUE,
 

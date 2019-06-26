@@ -21,9 +21,9 @@ import * as object from '../../yox-common/src/util/object'
  *
  * 可配置 cache、deps、get、set 等
  */
-export default class Computed implements ComputedInterface {
+export default class Computed<T> implements ComputedInterface<T> {
 
-  static current?: Computed
+  static current?: Computed<any>
 
   keypath: string
 
@@ -37,7 +37,7 @@ export default class Computed implements ComputedInterface {
 
   context: any
 
-  observer: ObserverInterface
+  observer: ObserverInterface<T>
 
   getter: computedGetter
 
@@ -54,7 +54,7 @@ export default class Computed implements ComputedInterface {
     sync: boolean,
     cache: boolean,
     deps: string[],
-    observer: ObserverInterface,
+    observer: ObserverInterface<T>,
     getter: computedGetter,
     setter: computedSetter | void
   ) {
