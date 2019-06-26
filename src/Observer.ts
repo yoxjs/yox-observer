@@ -1,7 +1,7 @@
 import {
   data,
-  computedGetter,
-  computedSetter,
+  ComputedGetter,
+  ComputedSetter,
   ValueHolder,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -319,7 +319,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    */
   addComputed(
     keypath: string,
-    options: computedGetter | ComputedOptions
+    options: ComputedGetter<T> | ComputedOptions<T>
   ): Computed<T> | void {
 
     let cache = env.TRUE,
@@ -328,15 +328,15 @@ export default class Observer<T> implements ObserverInterface<T> {
 
     deps: string[] = [],
 
-    getter: computedGetter | void,
+    getter: ComputedGetter<T> | void,
 
-    setter: computedSetter | void
+    setter: ComputedSetter<T> | void
 
     if (is.func(options)) {
-      getter = options as computedGetter
+      getter = options as ComputedGetter<T>
     }
     else if (is.object(options)) {
-      const computedOptions = options as ComputedOptions
+      const computedOptions = options as ComputedOptions<T>
       if (is.boolean(computedOptions.cache)) {
         cache = computedOptions.cache as boolean
       }

@@ -1,6 +1,6 @@
 import {
-  computedGetter,
-  computedSetter,
+  ComputedGetter,
+  ComputedSetter,
   ComputedInterface,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -39,9 +39,9 @@ export default class Computed<T> implements ComputedInterface<T> {
 
   observer: ObserverInterface<T>
 
-  getter: computedGetter
+  getter: ComputedGetter<T>
 
-  setter: computedSetter | void
+  setter: ComputedSetter<T> | void
 
   watcher: Watcher<T>
 
@@ -55,8 +55,8 @@ export default class Computed<T> implements ComputedInterface<T> {
     cache: boolean,
     deps: string[],
     observer: ObserverInterface<T>,
-    getter: computedGetter,
-    setter: computedSetter | void
+    getter: ComputedGetter<T>,
+    setter: ComputedSetter<T> | void
   ) {
 
     const instance = this
