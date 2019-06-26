@@ -319,7 +319,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    */
   addComputed(
     keypath: string,
-    options: ComputedGetter<T> | ComputedOptions<T>
+    options: ComputedGetter<T> | ComputedOptions<T, any>
   ): Computed<T> | void {
 
     let cache = env.TRUE,
@@ -336,7 +336,7 @@ export default class Observer<T> implements ObserverInterface<T> {
       getter = options as ComputedGetter<T>
     }
     else if (is.object(options)) {
-      const computedOptions = options as ComputedOptions<T>
+      const computedOptions = options as ComputedOptions<T, any>
       if (is.boolean(computedOptions.cache)) {
         cache = computedOptions.cache as boolean
       }
