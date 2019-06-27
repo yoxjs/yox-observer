@@ -1,9 +1,4 @@
 import {
-  ComputedInterface,
-  ObserverInterface,
-} from '../../yox-type/src/observer'
-
-import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
@@ -12,6 +7,8 @@ import {
 import {
   WatcherOptions,
 } from '../../yox-type/src/options'
+
+import Observer from './Observer'
 
 import execute from '../../yox-common/src/function/execute'
 
@@ -24,7 +21,7 @@ import * as object from '../../yox-common/src/util/object'
  *
  * 可配置 cache、deps、get、set 等
  */
-export default class Computed implements ComputedInterface {
+export default class Computed {
 
   static current?: Computed
 
@@ -40,7 +37,7 @@ export default class Computed implements ComputedInterface {
 
   context: any
 
-  observer: ObserverInterface
+  observer: Observer
 
   getter: ComputedGetter
 
@@ -57,7 +54,7 @@ export default class Computed implements ComputedInterface {
     sync: boolean,
     cache: boolean,
     deps: string[],
-    observer: ObserverInterface,
+    observer: Observer,
     getter: ComputedGetter,
     setter: ComputedSetter | void
   ) {

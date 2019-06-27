@@ -12,10 +12,6 @@ import {
   EmitterOptions,
 } from '../../yox-type/src/options'
 
-import {
-  ObserverInterface,
-} from '../../yox-type/src/observer'
-
 import * as is from '../../yox-common/src/util/is'
 import * as env from '../../yox-common/src/util/env'
 import * as array from '../../yox-common/src/util/array'
@@ -54,7 +50,7 @@ interface AsyncChange {
  *
  * 对于外部调用 observer.watch('keypath', listener)，属于异步监听，它只关心是否变了，而不关心是否是立即触发的
  */
-export default class Observer implements ObserverInterface {
+export default class Observer {
 
   data: Data
 
