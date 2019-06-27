@@ -1,14 +1,17 @@
 import {
   ComputedInterface,
   ObserverInterface,
+} from '../../yox-type/src/observer'
+
+import {
+  Watcher,
+  ComputedGetter,
+  ComputedSetter,
 } from '../../yox-type/src/type'
 
 import {
-  ComputedGetter,
-  ComputedSetter,
-  Watcher,
   WatcherOptions,
-} from '../../yox-type/src/global'
+} from '../../yox-type/src/options'
 
 import execute from '../../yox-common/src/function/execute'
 
