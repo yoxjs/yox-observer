@@ -1,11 +1,11 @@
 import {
-  ComputedGetter,
-  ComputedSetter,
   ComputedInterface,
   ObserverInterface,
 } from '../../yox-type/src/type'
 
 import {
+  ComputedGetter,
+  ComputedSetter,
   Watcher,
   WatcherOptions,
 } from '../../yox-type/src/global'

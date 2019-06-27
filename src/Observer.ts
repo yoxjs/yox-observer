@@ -1,7 +1,5 @@
 import {
   Data,
-  ComputedGetter,
-  ComputedSetter,
   ValueHolder,
   ObserverInterface,
 } from '../../yox-type/src/type'
@@ -9,6 +7,8 @@ import {
 import {
   Watcher,
   WatcherOptions,
+  ComputedGetter,
+  ComputedSetter,
   ComputedOptions,
   EmitterOptions,
 } from '../../yox-type/src/global'
