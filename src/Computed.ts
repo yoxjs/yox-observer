@@ -39,13 +39,13 @@ export default class Computed<T> implements ComputedInterface<T> {
 
   observer: ObserverInterface<T>
 
-  getter: ComputedGetter<T>
+  getter: ComputedGetter
 
-  setter: ComputedSetter<T> | void
+  setter: ComputedSetter | void
 
-  watcher: Watcher<T>
+  watcher: Watcher
 
-  watcherOptions: WatcherOptions<T>
+  watcherOptions: WatcherOptions
 
   unique: Record<string, boolean>
 
@@ -55,8 +55,8 @@ export default class Computed<T> implements ComputedInterface<T> {
     cache: boolean,
     deps: string[],
     observer: ObserverInterface<T>,
-    getter: ComputedGetter<T>,
-    setter: ComputedSetter<T> | void
+    getter: ComputedGetter,
+    setter: ComputedSetter | void
   ) {
 
     const instance = this

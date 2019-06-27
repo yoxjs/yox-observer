@@ -319,7 +319,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    */
   addComputed(
     keypath: string,
-    options: ComputedGetter<T> | ComputedOptions<T, any>
+    options: ComputedGetter | ComputedOptions
   ): Computed<T> | void {
 
     let cache = env.TRUE,
@@ -328,15 +328,15 @@ export default class Observer<T> implements ObserverInterface<T> {
 
     deps: string[] = [],
 
-    getter: ComputedGetter<T> | void,
+    getter: ComputedGetter | void,
 
-    setter: ComputedSetter<T> | void
+    setter: ComputedSetter | void
 
     if (is.func(options)) {
-      getter = options as ComputedGetter<T>
+      getter = options as ComputedGetter
     }
     else if (is.object(options)) {
-      const computedOptions = options as ComputedOptions<T, any>
+      const computedOptions = options as ComputedOptions
       if (is.boolean(computedOptions.cache)) {
         cache = computedOptions.cache as boolean
       }
@@ -402,8 +402,8 @@ export default class Observer<T> implements ObserverInterface<T> {
    * @param immediate
    */
   watch(
-    keypath: string | Record<string, Watcher<T> | WatcherOptions<T>>,
-    watcher?: Watcher<T> | WatcherOptions<T>,
+    keypath: string | Record<string, Watcher | WatcherOptions>,
+    watcher?: Watcher | WatcherOptions,
     immediate?: boolean
   ) {
 
@@ -411,7 +411,7 @@ export default class Observer<T> implements ObserverInterface<T> {
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, options: WatcherOptions<T>) {
+    bind = function (keypath: string, options: WatcherOptions) {
 
       const emitter = options.sync ? syncEmitter : asyncEmitter,
 
@@ -445,15 +445,15 @@ export default class Observer<T> implements ObserverInterface<T> {
     if (is.string(keypath)) {
       bind(
         keypath as string,
-        formatWatcherOptions(watcher, immediate) as WatcherOptions<T>
+        formatWatcherOptions(watcher, immediate) as WatcherOptions
       )
       return
     }
 
     object.each(
       keypath as Data,
-      function (options: Watcher<T> | WatcherOptions<T>, keypath: string) {
-        bind(keypath, formatWatcherOptions(options) as WatcherOptions<T>)
+      function (options: Watcher | WatcherOptions, keypath: string) {
+        bind(keypath, formatWatcherOptions(options) as WatcherOptions)
       }
     )
 
@@ -467,7 +467,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    */
   unwatch(
     keypath?: string,
-    watcher?: Watcher<T>
+    watcher?: Watcher
   ) {
     this.syncEmitter.off(keypath, watcher)
     this.asyncEmitter.off(keypath, watcher)
