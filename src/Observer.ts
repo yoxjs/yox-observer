@@ -1,5 +1,5 @@
 import {
-  data,
+  Data,
   ComputedGetter,
   ComputedSetter,
   ValueHolder,
@@ -53,7 +53,7 @@ interface AsyncChange {
  */
 export default class Observer<T> implements ObserverInterface<T> {
 
-  data: data
+  data: Data
 
   context: T
 
@@ -71,7 +71,7 @@ export default class Observer<T> implements ObserverInterface<T> {
 
   pending?: boolean
 
-  constructor(data?: data, context?: any) {
+  constructor(data?: Data, context?: any) {
 
     const instance = this
 
@@ -149,7 +149,7 @@ export default class Observer<T> implements ObserverInterface<T> {
    * @param value
    */
   set(
-    keypath: string | data,
+    keypath: string | Data,
     value?: any
   ) {
 
@@ -197,7 +197,7 @@ export default class Observer<T> implements ObserverInterface<T> {
       setValue(value, keypath as string)
     }
     else if (is.object(keypath)) {
-      object.each(keypath as data, setValue)
+      object.each(keypath as Data, setValue)
     }
 
   }
@@ -451,7 +451,7 @@ export default class Observer<T> implements ObserverInterface<T> {
     }
 
     object.each(
-      keypath as data,
+      keypath as Data,
       function (options: Watcher<T> | WatcherOptions<T>, keypath: string) {
         bind(keypath, formatWatcherOptions(options) as WatcherOptions<T>)
       }
