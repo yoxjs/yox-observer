@@ -11,7 +11,7 @@ export default function (
   keypath: string,
   newValue: any,
   oldValue: any,
-  watcher: Object, isRecursive: boolean,
+  watcher: object, isRecursive: boolean,
   callback: (watchKeypath: string, keypath: string, newValue: any, oldValue: any) => void
 ) {
 
