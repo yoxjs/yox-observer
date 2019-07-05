@@ -252,7 +252,7 @@ export default class Observer {
 
         array.each(
           asyncEmitter.listeners[watchKeypath],
-          function (item: EmitterOptions) {
+          function (item) {
             (item.count as number)++
           }
         )
@@ -300,7 +300,7 @@ export default class Observer {
 
         array.each(
           change.keypaths,
-          function (watchKeypath: string) {
+          function (watchKeypath) {
             asyncEmitter.fire(watchKeypath, args, filterWatcher)
           }
         )

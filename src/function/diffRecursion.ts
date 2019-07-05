@@ -22,7 +22,7 @@ export default function diffRecursion(
 
       array.each(
         watchFuzzyKeypaths,
-        function (fuzzyKeypath: string) {
+        function (fuzzyKeypath) {
           if (isDef(keypathUtil.matchFuzzy(newKeypath, fuzzyKeypath))) {
             callback(
               fuzzyKeypath, newKeypath, subNewValue, subOldValue

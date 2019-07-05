@@ -94,7 +94,7 @@ export default class Computed {
     if (instance.fixed = !array.falsy(deps)) {
       array.each(
         deps,
-        function (dep: string) {
+        function (dep) {
           observer.watch(
             dep,
             instance.watcherOptions
@@ -201,7 +201,7 @@ export default class Computed {
 
     array.each(
       deps,
-      function (dep: string) {
+      function (dep) {
         observer.unwatch(dep, watcher)
       },
       env.TRUE
