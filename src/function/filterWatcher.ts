@@ -1,4 +1,8 @@
 import {
+  Namespace,
+} from '../../../yox-type/src/type'
+
+import {
   EmitterOptions,
 } from '../../../yox-type/src/options'
 
@@ -8,7 +12,7 @@ import {
  * @param item
  * @param data
  */
-export default function (_: string, args: any[] | void, options: EmitterOptions): boolean | void {
+export default function (_: Namespace, args: any[] | void, options: EmitterOptions): boolean | void {
 
   if (options.count && args) {
 
