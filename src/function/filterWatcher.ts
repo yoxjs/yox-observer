@@ -1,6 +1,6 @@
 import {
   Namespace,
-} from '../../../yox-type/src/type'
+} from '../../../yox-type/src/emitter'
 
 import {
   EmitterOptions,
