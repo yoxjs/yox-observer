@@ -1,7 +1,7 @@
 
 import Observer from '../src/Observer';
 
-it('watch immediate or not', () => {
+test('watch immediate or not', () => {
 
   let count1 = 0, count2 = 0, count3 = 0, count4 = 0, count5 = 0, count6 = 0
 
@@ -60,7 +60,7 @@ it('watch immediate or not', () => {
 
 })
 
-it('watch sync', done => {
+test('watch sync', done => {
 
   let observer = new Observer()
 
@@ -108,7 +108,7 @@ it('watch sync', done => {
 
 })
 
-it('watch once', done => {
+test('watch once', done => {
 
   let observer = new Observer({ })
 
@@ -144,7 +144,7 @@ it('watch once', done => {
 })
 
 
-it('unwatch', done => {
+test('unwatch', done => {
 
   let observer = new Observer({ })
 
@@ -166,7 +166,7 @@ it('unwatch', done => {
 
 })
 
-it('get default value', () => {
+test('get default value', () => {
 
   let observer = new Observer()
 
@@ -174,7 +174,7 @@ it('get default value', () => {
 
 })
 
-it('increase', () => {
+test('increase', () => {
 
   let observer = new Observer()
 
@@ -189,7 +189,7 @@ it('increase', () => {
 
 })
 
-it('decrease', () => {
+test('decrease', () => {
 
   let observer = new Observer()
 
@@ -204,7 +204,7 @@ it('decrease', () => {
 
 })
 
-it('toggle', () => {
+test('toggle', () => {
 
   let observer = new Observer()
 
@@ -216,7 +216,7 @@ it('toggle', () => {
 
 })
 
-it('simple undo', done => {
+test('simple undo', done => {
 
   let observer = new Observer({
     name: 1
@@ -240,7 +240,7 @@ it('simple undo', done => {
 
 })
 
-it('complex undo', done => {
+test('complex undo', done => {
 
   let observer = new Observer(
     {
@@ -281,7 +281,7 @@ it('complex undo', done => {
 
 })
 
-it('change computed data', done => {
+test('change computed data', done => {
 
   let call1 = 0, call2 = 0
   let observer = new Observer(
@@ -342,7 +342,7 @@ it('change computed data', done => {
 
 })
 
-it('change computed fuzzy data', done => {
+test('change computed fuzzy data', done => {
 
   let observer = new Observer(
     {
@@ -386,7 +386,7 @@ it('change computed fuzzy data', done => {
 
 })
 
-it('watch object property', done => {
+test('watch object property', done => {
 
   let observer = new Observer({
     user: {
@@ -428,7 +428,7 @@ it('watch object property', done => {
 
 })
 
-it('simple dependency', done => {
+test('simple dependency', done => {
 
   let observer = new Observer(
     {
@@ -526,7 +526,7 @@ it('simple dependency', done => {
 })
 
 
-it('complex dependency', done => {
+test('complex dependency', done => {
 
   let observer = new Observer(
     {
@@ -563,26 +563,26 @@ it('complex dependency', done => {
     }
   )
 
-  let list0Count = 0, list0SelectedNew, list0SelectedOld
+  let list0Count = 0, list0SelectedNew: any, list0SelectedOld: any
   observer.watch('list.0.selected', function (newValue, oldValue) {
     list0Count++
     list0SelectedNew = newValue
     list0SelectedOld = oldValue
   })
-  let list1Count = 0, list1SelectedNew, list1SelectedOld
+  let list1Count = 0, list1SelectedNew: any, list1SelectedOld: any
   observer.watch('list.1.selected', function (newValue, oldValue) {
     list1Count++
     list1SelectedNew = newValue
     list1SelectedOld = oldValue
   })
 
-  let selectedListCount = 0, selectedListNew, selectedListOld
+  let selectedListCount = 0, selectedListNew: any, selectedListOld: any
   observer.watch('selectedList', function (newValue, oldValue) {
     selectedListCount++
     selectedListNew = newValue
     selectedListOld = oldValue
   })
-  let sortedSelectedListCount = 0, sortedSelectedListNew, sortedSelectedListOld
+  let sortedSelectedListCount = 0, sortedSelectedListNew: any, sortedSelectedListOld: any
   observer.watch('sortedSelectedList', function (newValue, oldValue) {
     sortedSelectedListCount++
     sortedSelectedListNew = newValue
@@ -607,6 +607,22 @@ it('complex dependency', done => {
     done()
   })
 
+  // ts 会报以下变量没用过，那就在这用下咯，不然怎么办...
+  list0Count
+  list0SelectedNew
+  list0SelectedOld
+
+  list1Count
+  list1SelectedNew
+  list1SelectedOld
+
+  selectedListCount
+  selectedListNew
+  selectedListOld
+
+  sortedSelectedListCount
+  sortedSelectedListNew
+  sortedSelectedListOld
 
 
 })
