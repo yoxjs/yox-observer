@@ -1,8 +1,4 @@
 import {
-  Namespace,
-} from 'yox-common/src/type/event'
-
-import {
   EmitterOptions,
 } from 'yox-common/src/type/options'
 
@@ -12,7 +8,7 @@ import {
  * @param item
  * @param data
  */
-export default function (_: Namespace, args: any[] | void, options: EmitterOptions): boolean | void {
+export default function (_: any, args: any[] | void, options: EmitterOptions): boolean | void {
 
   if (options.count && args) {
 
