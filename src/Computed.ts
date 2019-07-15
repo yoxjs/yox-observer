@@ -2,19 +2,19 @@ import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
-} from '../../yox-type/src/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
-} from '../../yox-type/src/options'
+} from 'yox-type/src/options'
 
 import Observer from './Observer'
 
-import execute from '../../yox-common/src/function/execute'
+import execute from 'yox-common/src/function/execute'
 
-import * as env from '../../yox-common/src/util/env'
-import * as array from '../../yox-common/src/util/array'
-import * as object from '../../yox-common/src/util/object'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
 
 /**
  * 计算属性

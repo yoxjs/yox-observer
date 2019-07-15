@@ -4,24 +4,24 @@ import {
   ValueHolder,
   ComputedGetter,
   ComputedSetter,
-} from '../../yox-type/src/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
   ComputedOptions,
   EmitterOptions,
-} from '../../yox-type/src/options'
+} from 'yox-type/src/options'
 
-import * as is from '../../yox-common/src/util/is'
-import * as env from '../../yox-common/src/util/env'
-import * as array from '../../yox-common/src/util/array'
-import * as object from '../../yox-common/src/util/object'
-import * as string from '../../yox-common/src/util/string'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as object from 'yox-common/src/util/object'
+import * as string from 'yox-common/src/util/string'
 
-import toNumber from '../../yox-common/src/function/toNumber'
-import execute from '../../yox-common/src/function/execute'
-import Emitter from '../../yox-common/src/util/Emitter'
-import NextTask from '../../yox-common/src/util/NextTask'
+import toNumber from 'yox-common/src/function/toNumber'
+import execute from 'yox-common/src/function/execute'
+import Emitter from 'yox-common/src/util/Emitter'
+import NextTask from 'yox-common/src/util/NextTask'
 
 import Computed from './Computed'
 import matchBest from './function/matchBest'

@@ -1,7 +1,7 @@
-import * as env from '../../../yox-common/src/util/env'
-import * as array from '../../../yox-common/src/util/array'
-import * as string from '../../../yox-common/src/util/string'
-import * as keypathUtil from '../../../yox-common/src/util/keypath'
+import * as env from 'yox-common/src/util/env'
+import * as array from 'yox-common/src/util/array'
+import * as string from 'yox-common/src/util/string'
+import * as keypathUtil from 'yox-common/src/util/keypath'
 
 /**
  * 从 keypath 数组中选择和 keypath 最匹配的那一个

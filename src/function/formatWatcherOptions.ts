@@ -1,14 +1,14 @@
 import {
   Watcher,
-} from '../../../yox-type/src/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
-} from '../../../yox-type/src/options'
+} from 'yox-type/src/options'
 
-import * as is from '../../../yox-common/src/util/is'
-import * as env from '../../../yox-common/src/util/env'
-import * as logger from '../../../yox-common/src/util/logger'
+import * as is from 'yox-common/src/util/is'
+import * as env from 'yox-common/src/util/env'
+import * as logger from 'yox-common/src/util/logger'
 
 // 避免频繁创建对象
 const optionsHolder: WatcherOptions = {
