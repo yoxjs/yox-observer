@@ -1,10 +1,10 @@
 import {
   Watcher,
-} from 'yox-type/src/type'
+} from 'yox-common/src/type/type'
 
 import {
   WatcherOptions,
-} from 'yox-type/src/options'
+} from 'yox-common/src/type/options'
 
 import * as is from 'yox-common/src/util/is'
 import * as env from 'yox-common/src/util/env'

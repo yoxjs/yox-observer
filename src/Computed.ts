@@ -2,11 +2,11 @@ import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
-} from 'yox-type/src/type'
+} from 'yox-common/src/type/type'
 
 import {
   WatcherOptions,
-} from 'yox-type/src/options'
+} from 'yox-common/src/type/options'
 
 import Observer from './Observer'
 

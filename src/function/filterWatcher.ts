@@ -1,10 +1,10 @@
 import {
   Namespace,
-} from 'yox-type/src/event'
+} from 'yox-common/src/type/event'
 
 import {
   EmitterOptions,
-} from 'yox-type/src/options'
+} from 'yox-common/src/type/options'
 
 /**
  * 触发异步变化时，用此函数过滤下，哪些 listener 应该执行
