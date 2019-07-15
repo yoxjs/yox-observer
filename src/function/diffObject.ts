@@ -1,5 +1,5 @@
+import * as constant from 'yox-type/src/constant'
 import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
 import * as object from 'yox-common/src/util/object'
 
 /**
@@ -21,8 +21,8 @@ export default function (
 
   if (newIsObject || oldIsObject) {
 
-    newValue = newIsObject ? newValue : env.EMPTY_OBJECT
-    oldValue = oldIsObject ? oldValue : env.EMPTY_OBJECT
+    newValue = newIsObject ? newValue : constant.EMPTY_OBJECT
+    oldValue = oldIsObject ? oldValue : constant.EMPTY_OBJECT
 
     if (newIsObject) {
       object.each(

@@ -1,9 +1,9 @@
-import * as env from 'yox-common/src/util/env'
+import * as constant from 'yox-type/src/constant'
 import * as object from 'yox-common/src/util/object'
 
 export default function (source: any, keypath: string): any {
 
-  if (source == env.NULL || keypath === env.EMPTY_STRING) {
+  if (source == constant.NULL || keypath === constant.EMPTY_STRING) {
     return source
   }
 

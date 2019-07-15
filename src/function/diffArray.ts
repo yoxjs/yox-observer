@@ -1,5 +1,5 @@
+import * as constant from 'yox-type/src/constant'
 import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
 
 /**
  * 对比新旧数组
@@ -20,12 +20,12 @@ export default function (
 
   if (newIsArray || oldIsArray) {
 
-    const newLength = newIsArray ? newValue.length : env.UNDEFINED,
+    const newLength = newIsArray ? newValue.length : constant.UNDEFINED,
 
-    oldLength = oldIsArray ? oldValue.length : env.UNDEFINED
+    oldLength = oldIsArray ? oldValue.length : constant.UNDEFINED
 
     callback(
-      env.RAW_LENGTH,
+      constant.RAW_LENGTH,
       newLength,
       oldLength
     )
@@ -33,12 +33,12 @@ export default function (
     for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
         '' + i,
-        newValue ? newValue[i] : env.UNDEFINED,
-        oldValue ? oldValue[i] : env.UNDEFINED
+        newValue ? newValue[i] : constant.UNDEFINED,
+        oldValue ? oldValue[i] : constant.UNDEFINED
       )
     }
 
-    return env.TRUE
+    return constant.TRUE
 
   }
 

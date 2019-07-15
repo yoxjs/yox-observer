@@ -4,16 +4,17 @@ import {
   ValueHolder,
   ComputedGetter,
   ComputedSetter,
-} from 'yox-common/src/type/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
   ComputedOptions,
   EmitterOptions,
-} from 'yox-common/src/type/options'
+} from 'yox-type/src/options'
+
+import * as constant from 'yox-type/src/constant'
 
 import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 import * as string from 'yox-common/src/util/string'
@@ -105,7 +106,7 @@ export default class Observer {
     { data, computed, reversedComputedKeys } = instance
 
     // 传入 '' 获取整个 data
-    if (keypath === env.EMPTY_STRING) {
+    if (keypath === constant.EMPTY_STRING) {
       return data
     }
 
@@ -263,11 +264,11 @@ export default class Observer {
         }
 
         if (!instance.pending) {
-          instance.pending = env.TRUE
+          instance.pending = constant.TRUE
           instance.nextTask.append(
             function () {
               if (instance.pending) {
-                instance.pending = env.UNDEFINED
+                instance.pending = constant.UNDEFINED
                 instance.diffAsync()
               }
             }
@@ -321,9 +322,9 @@ export default class Observer {
     options: ComputedGetter | ComputedOptions
   ): Computed | void {
 
-    let cache = env.TRUE,
+    let cache = constant.TRUE,
 
-    sync = env.TRUE,
+    sync = constant.TRUE,
 
     deps: string[] = [],
 
@@ -365,7 +366,7 @@ export default class Observer {
       }
 
       instance.computed[keypath] = computed
-      instance.reversedComputedKeys = object.sort(instance.computed, env.TRUE)
+      instance.reversedComputedKeys = object.sort(instance.computed, constant.TRUE)
 
       return computed
 
@@ -388,7 +389,7 @@ export default class Observer {
 
     if (computed && object.has(computed, keypath)) {
       delete computed[keypath]
-      instance.reversedComputedKeys = object.sort(computed, env.TRUE)
+      instance.reversedComputedKeys = object.sort(computed, constant.TRUE)
     }
 
   }
@@ -433,7 +434,7 @@ export default class Observer {
           context,
           [
             instance.get(keypath),
-            env.UNDEFINED,
+            constant.UNDEFINED,
             keypath
           ]
         )
@@ -533,10 +534,10 @@ export default class Observer {
     list = !is.array(list) ? [] : object.copy(list)
 
     const { length } = list
-    if (index === env.TRUE || index === length) {
+    if (index === constant.TRUE || index === length) {
       list.push(item)
     }
-    else if (index === env.FALSE || index === 0) {
+    else if (index === constant.FALSE || index === 0) {
       list.unshift(item)
     }
     else if (index > 0 && index < length) {
@@ -548,7 +549,7 @@ export default class Observer {
 
     this.set(keypath, list)
 
-    return env.TRUE
+    return constant.TRUE
 
   }
 
@@ -559,7 +560,7 @@ export default class Observer {
    * @param item
    */
   append(keypath: string, item: any): true | void {
-    return this.insert(keypath, item, env.TRUE)
+    return this.insert(keypath, item, constant.TRUE)
   }
 
   /**
@@ -569,7 +570,7 @@ export default class Observer {
    * @param item
    */
   prepend(keypath: string, item: any): true | void {
-    return this.insert(keypath, item, env.FALSE)
+    return this.insert(keypath, item, constant.FALSE)
   }
 
   /**
@@ -587,7 +588,7 @@ export default class Observer {
       list = object.copy(list)
       list.splice(index, 1)
       this.set(keypath, list)
-      return env.TRUE
+      return constant.TRUE
     }
   }
 
@@ -603,7 +604,7 @@ export default class Observer {
       list = object.copy(list)
       if (array.remove(list, item)) {
         this.set(keypath, list)
-        return env.TRUE
+        return constant.TRUE
       }
     }
   }

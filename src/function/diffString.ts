@@ -1,5 +1,5 @@
+import * as constant from 'yox-type/src/constant'
 import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
 
 /**
  * 对比新旧数组
@@ -20,11 +20,11 @@ export default function (
 
   if (newIsString || oldIsString) {
     callback(
-      env.RAW_LENGTH,
-      newIsString ? newValue.length : env.UNDEFINED,
-      oldIsString ? oldValue.length : env.UNDEFINED
+      constant.RAW_LENGTH,
+      newIsString ? newValue.length : constant.UNDEFINED,
+      oldIsString ? oldValue.length : constant.UNDEFINED
     )
-    return env.TRUE
+    return constant.TRUE
   }
 
 }

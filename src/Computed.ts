@@ -2,17 +2,18 @@ import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
-} from 'yox-common/src/type/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
-} from 'yox-common/src/type/options'
+} from 'yox-type/src/options'
+
+import * as constant from 'yox-type/src/constant'
 
 import Observer from './Observer'
 
 import execute from 'yox-common/src/function/execute'
 
-import * as env from 'yox-common/src/util/env'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 
@@ -78,7 +79,7 @@ export default class Computed {
       // 计算属性的依赖变了会走进这里
 
       const oldValue = instance.value,
-      newValue = instance.get(env.TRUE)
+      newValue = instance.get(constant.TRUE)
 
       if (newValue !== oldValue) {
         observer.diff(keypath, newValue, oldValue)
@@ -122,7 +123,7 @@ export default class Computed {
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
-    else if (force || !object.has(instance, env.RAW_VALUE)) {
+    else if (force || !object.has(instance, constant.RAW_VALUE)) {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.fixed) {
@@ -165,7 +166,7 @@ export default class Computed {
    * @param dep
    */
   add(dep: string): void {
-    this.unique[dep] = env.TRUE
+    this.unique[dep] = constant.TRUE
   }
 
   /**
@@ -204,7 +205,7 @@ export default class Computed {
       function (dep) {
         observer.unwatch(dep, watcher)
       },
-      env.TRUE
+      constant.TRUE
     )
 
     deps.length = 0

@@ -1,4 +1,4 @@
-import * as env from 'yox-common/src/util/env'
+import * as constant from 'yox-type/src/constant'
 import * as array from 'yox-common/src/util/array'
 import * as string from 'yox-common/src/util/string'
 import * as keypathUtil from 'yox-common/src/util/keypath'
@@ -22,7 +22,7 @@ export default function (sorted: string[], keypath: string): any {
           name: prefix,
           prop: string.slice(keypath, length)
         }
-        return env.FALSE
+        return constant.FALSE
       }
     }
   )

@@ -1,18 +1,19 @@
 import {
   Watcher,
-} from 'yox-common/src/type/type'
+} from 'yox-type/src/type'
 
 import {
   WatcherOptions,
-} from 'yox-common/src/type/options'
+} from 'yox-type/src/options'
+
+import * as constant from 'yox-type/src/constant'
 
 import * as is from 'yox-common/src/util/is'
-import * as env from 'yox-common/src/util/env'
 import * as logger from 'yox-common/src/util/logger'
 
 // 避免频繁创建对象
 const optionsHolder: WatcherOptions = {
-  watcher: env.EMPTY_FUNCTION
+  watcher: constant.EMPTY_FUNCTION
 }
 
 /**
@@ -24,7 +25,7 @@ export default function (options: Watcher | WatcherOptions | void, immediate: bo
 
   if (is.func(options)) {
     optionsHolder.watcher = options as Watcher
-    optionsHolder.immediate = immediate === env.TRUE
+    optionsHolder.immediate = immediate === constant.TRUE
     return optionsHolder
   }
 
