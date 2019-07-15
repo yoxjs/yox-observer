@@ -1,6 +1,6 @@
 import {
   Namespace,
-} from 'yox-type/src/emitter'
+} from 'yox-type/src/event'
 
 import {
   EmitterOptions,
