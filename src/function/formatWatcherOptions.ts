@@ -6,10 +6,9 @@ import {
   WatcherOptions,
 } from 'yox-type/src/options'
 
-import * as constant from 'yox-type/src/constant'
-
 import * as is from 'yox-common/src/util/is'
 import * as logger from 'yox-common/src/util/logger'
+import * as constant from 'yox-common/src/util/constant'
 
 // 避免频繁创建对象
 const optionsHolder: WatcherOptions = {

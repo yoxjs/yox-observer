@@ -1,5 +1,5 @@
-import * as constant from 'yox-type/src/constant'
 import * as is from 'yox-common/src/util/is'
+import * as constant from 'yox-common/src/util/constant'
 
 /**
  * 对比新旧数组

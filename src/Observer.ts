@@ -12,12 +12,11 @@ import {
   EmitterOptions,
 } from 'yox-type/src/options'
 
-import * as constant from 'yox-type/src/constant'
-
 import * as is from 'yox-common/src/util/is'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 import * as string from 'yox-common/src/util/string'
+import * as constant from 'yox-common/src/util/constant'
 
 import toNumber from 'yox-common/src/function/toNumber'
 import execute from 'yox-common/src/function/execute'

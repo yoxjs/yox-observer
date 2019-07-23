@@ -1,5 +1,5 @@
-import * as constant from 'yox-type/src/constant'
 import * as object from 'yox-common/src/util/object'
+import * as constant from 'yox-common/src/util/constant'
 
 export default function (source: any, keypath: string): any {
 

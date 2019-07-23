@@ -1,6 +1,6 @@
-import * as constant from 'yox-type/src/constant'
 import * as is from 'yox-common/src/util/is'
 import * as object from 'yox-common/src/util/object'
+import * as constant from 'yox-common/src/util/constant'
 
 /**
  * 对比新旧对象

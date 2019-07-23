@@ -8,14 +8,13 @@ import {
   WatcherOptions,
 } from 'yox-type/src/options'
 
-import * as constant from 'yox-type/src/constant'
-
 import Observer from './Observer'
 
 import execute from 'yox-common/src/function/execute'
 
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
+import * as constant from 'yox-common/src/util/constant'
 
 /**
  * 计算属性
