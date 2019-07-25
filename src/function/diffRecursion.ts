@@ -1,5 +1,5 @@
-import isDef from 'yox-common/src/function/isDef'
 import * as array from 'yox-common/src/util/array'
+import * as constant from 'yox-common/src/util/constant'
 import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import diffString from './diffString'
@@ -23,7 +23,7 @@ export default function diffRecursion(
       array.each(
         watchFuzzyKeypaths,
         function (fuzzyKeypath) {
-          if (isDef(keypathUtil.matchFuzzy(newKeypath, fuzzyKeypath))) {
+          if (keypathUtil.matchFuzzy(newKeypath, fuzzyKeypath) !== constant.UNDEFINED) {
             callback(
               fuzzyKeypath, newKeypath, subNewValue, subOldValue
             )

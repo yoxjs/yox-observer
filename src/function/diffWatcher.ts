@@ -1,7 +1,7 @@
-import isDef from 'yox-common/src/function/isDef'
 import * as array from 'yox-common/src/util/array'
 import * as object from 'yox-common/src/util/object'
 import * as string from 'yox-common/src/util/string'
+import * as constant from 'yox-common/src/util/constant'
 import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import readValue from './readValue'
@@ -30,7 +30,7 @@ export default function (
         // 此时要知道设置 users.0 到底会不会改变 users.*.name 需要靠递归了
 
         // 如果匹配，则无需递归
-        if (isDef(keypathUtil.matchFuzzy(keypath, watchKeypath))) {
+        if (keypathUtil.matchFuzzy(keypath, watchKeypath) !== constant.UNDEFINED) {
           callback(
             watchKeypath, keypath, newValue, oldValue
           )
