@@ -22,9 +22,9 @@ import toNumber from 'yox-common/src/function/toNumber'
 import execute from 'yox-common/src/function/execute'
 import Emitter from 'yox-common/src/util/Emitter'
 import NextTask from 'yox-common/src/util/NextTask'
+import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import Computed from './Computed'
-import matchBest from './function/matchBest'
 import diffWatcher from './function/diffWatcher'
 import filterWatcher from './function/filterWatcher'
 import formatWatcherOptions from './function/formatWatcherOptions'
@@ -59,8 +59,6 @@ export default class Observer {
   nextTask: NextTask
 
   computed?: Record<string, Computed>
-
-  reversedComputedKeys?: string[]
 
   syncEmitter: Emitter
 
@@ -102,7 +100,7 @@ export default class Observer {
 
     currentComputed = Computed.current,
 
-    { data, computed, reversedComputedKeys } = instance
+    { data, computed } = instance
 
     // 传入 '' 获取整个 data
     if (keypath === constant.EMPTY_STRING) {
@@ -115,22 +113,10 @@ export default class Observer {
       currentComputed.add(keypath)
     }
 
-    let result: ValueHolder | void, target: Computed | void
+    let result: ValueHolder | void
 
     if (computed) {
-      target = computed[keypath]
-      if (target) {
-        return target.get()
-      }
-      if (reversedComputedKeys) {
-        const match = matchBest(reversedComputedKeys, keypath)
-        if (match && match.prop) {
-          result = object.get(
-            computed[match.name].get(),
-            match.prop
-          )
-        }
-      }
+      result = object.get(computed, keypath)
     }
 
     if (!result) {
@@ -154,7 +140,7 @@ export default class Observer {
 
     const instance = this,
 
-    { data, computed, reversedComputedKeys } = instance,
+    { data, computed } = instance,
 
     setValue = function (newValue: any, keypath: string) {
 
@@ -163,30 +149,44 @@ export default class Observer {
         return
       }
 
-      let target: Computed | void
+      let next: any
 
-      if (computed) {
-        target = computed[keypath]
-        if (target) {
-          target.set(newValue)
-        }
-        if (reversedComputedKeys) {
-          const match = matchBest(reversedComputedKeys, keypath)
-          if (match && match.prop) {
-            target = computed[match.name]
-            if (target) {
-              const targetValue = target.get()
-              if (is.object(targetValue)) {
-                object.set(targetValue, match.prop, newValue)
+      keypathUtil.each(
+        keypath,
+        function (key, index, lastIndex) {
+
+          if (index === 0) {
+            if (computed && computed[key]) {
+              if (lastIndex === 0) {
+                computed[key].set(newValue)
+              }
+              else {
+                // 这里 next 可能为空
+                next = computed[key].get()
               }
             }
+            else {
+              if (lastIndex === 0) {
+                data[key] = newValue
+              }
+              else {
+                next = data[key] || (data[key] = {})
+              }
+            }
+            return
           }
-        }
-      }
 
-      if (!target) {
-        object.set(data, keypath, newValue)
-      }
+          if (next) {
+            if (index === lastIndex) {
+              next[key] = newValue
+            }
+            else {
+              next = next[key] || (next[key] = {})
+            }
+          }
+
+        }
+      )
 
       instance.diff(keypath, newValue, oldValue)
 
@@ -365,7 +365,6 @@ export default class Observer {
       }
 
       instance.computed[keypath] = computed
-      instance.reversedComputedKeys = object.sort(instance.computed, constant.TRUE)
 
       return computed
 
@@ -388,7 +387,6 @@ export default class Observer {
 
     if (computed && object.has(computed, keypath)) {
       delete computed[keypath]
-      instance.reversedComputedKeys = object.sort(computed, constant.TRUE)
     }
 
   }
