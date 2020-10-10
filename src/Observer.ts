@@ -10,6 +10,7 @@ import {
   WatcherOptions,
   ComputedOptions,
   EmitterOptions,
+  EmitterFilter,
 } from 'yox-type/src/options'
 
 import * as is from 'yox-common/src/util/is'
@@ -229,7 +230,15 @@ export default class Observer {
       keypath, newValue, oldValue,
       syncEmitter.listeners, isRecursive,
       function (watchKeypath: string, keypath: string, newValue: any, oldValue: any) {
-        syncEmitter.fire(watchKeypath, [newValue, oldValue, keypath])
+        syncEmitter.fire(
+          {
+            type: watchKeypath,
+            ns: constant.EMPTY_STRING,
+          }, 
+          [
+            newValue, oldValue, keypath
+          ]
+        )
       }
     )
 
@@ -301,7 +310,14 @@ export default class Observer {
         array.each(
           change.keypaths,
           function (watchKeypath) {
-            asyncEmitter.fire(watchKeypath, args, filterWatcher)
+            asyncEmitter.fire(
+              {
+                type: watchKeypath,
+                ns: constant.EMPTY_STRING,
+              }, 
+              args,
+              filterWatcher
+            )
           }
         )
 
@@ -414,6 +430,7 @@ export default class Observer {
 
       // formatWatcherOptions 保证了 options.watcher 一定存在
       listener: EmitterOptions = {
+        ns: constant.EMPTY_STRING,
         fn: options.watcher,
         ctx: context,
         count: 0,
@@ -466,8 +483,12 @@ export default class Observer {
     keypath?: string,
     watcher?: Watcher
   ) {
-    this.syncEmitter.off(keypath, watcher)
-    this.asyncEmitter.off(keypath, watcher)
+    let filter: EmitterFilter = {
+      ns: constant.EMPTY_STRING,
+      fn: watcher,
+    }
+    this.syncEmitter.off(keypath, filter)
+    this.asyncEmitter.off(keypath, filter)
   }
 
   /**
