@@ -431,7 +431,7 @@ export default class Observer {
       // formatWatcherOptions 保证了 options.watcher 一定存在
       listener: EmitterOptions = {
         ns: constant.EMPTY_STRING,
-        fn: options.watcher,
+        listener: options.watcher,
         ctx: context,
         count: 0,
       }
@@ -485,7 +485,7 @@ export default class Observer {
   ) {
     let filter: EmitterFilter = {
       ns: constant.EMPTY_STRING,
-      fn: watcher,
+      listener: watcher,
     }
     this.syncEmitter.off(keypath, filter)
     this.asyncEmitter.off(keypath, filter)
