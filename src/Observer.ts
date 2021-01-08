@@ -213,7 +213,7 @@ export default class Observer {
     keypath: string,
     newValue: any,
     oldValue: any
-  ): void {
+  ) {
 
     const instance = this,
 
@@ -290,7 +290,7 @@ export default class Observer {
   /**
    * 异步触发的 diff
    */
-  diffAsync(): void {
+  diffAsync() {
 
     const instance = this,
 
@@ -337,18 +337,24 @@ export default class Observer {
     options: ComputedGetter | ComputedOptions
   ): Computed | void {
 
-    let cache = constant.TRUE,
+    let instance = this,
+
+    context = instance.context,
+    
+    cache = constant.TRUE,
 
     sync = constant.TRUE,
 
-    deps: string[] = [],
+    deps: string[] | void,
 
     getter: ComputedGetter | void,
 
     setter: ComputedSetter | void
 
+    // 这里用 bind 方法转换一下调用的 this
+    // 还有一个好处，它比 call(context) 速度稍快一些
     if (is.func(options)) {
-      getter = options as ComputedGetter
+      getter = (options as ComputedGetter).bind(context)
     }
     else if (is.object(options)) {
       const computedOptions = options as ComputedOptions
@@ -358,23 +364,21 @@ export default class Observer {
       if (is.boolean(computedOptions.sync)) {
         sync = computedOptions.sync as boolean
       }
-      // 因为可能会修改 deps，所以这里创建一个新的 deps，避免影响外部传入的 deps
-      if (is.array(computedOptions.deps)) {
-        deps = object.copy(computedOptions.deps)
+      // 传入空数组等同于没传
+      if (!array.falsy(computedOptions.deps)) {
+        deps = computedOptions.deps as string[]
       }
       if (is.func(computedOptions.get)) {
-        getter = computedOptions.get
+        getter = computedOptions.get.bind(context)
       }
       if (is.func(computedOptions.set)) {
-        setter = computedOptions.set
+        setter = (computedOptions.set as ComputedSetter).bind(context)
       }
     }
 
     if (getter) {
 
-      const instance = this,
-
-      computed = new Computed(keypath, sync, cache, deps, instance, getter, setter)
+      const computed = new Computed(keypath, sync, cache, deps, instance, getter, setter)
 
       if (!instance.computed) {
         instance.computed = {}
@@ -395,7 +399,7 @@ export default class Observer {
    */
   removeComputed(
     keypath: string
-  ): void {
+  ) {
 
     const instance = this,
 

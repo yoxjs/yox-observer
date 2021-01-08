@@ -12,7 +12,7 @@
   },
   "scripts": {
     "tsc": "tsc",
-    "test": "export NODE_ENV=development && jest"
+    "test": "jest"
   },
   "keywords": [],
   "author": "musicode",

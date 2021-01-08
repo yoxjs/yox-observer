@@ -1,5 +1,5 @@
 
-import Observer from '../src/Observer';
+import Observer from 'yox-observer/src/Observer';
 
 test('watch immediate or not', () => {
 

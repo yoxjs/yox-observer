@@ -32,9 +32,10 @@ export default function (
 
     for (let i = 0, length = Math.max(newLength || 0, oldLength || 0); i < length; i++) {
       callback(
-        '' + i,
-        newValue ? newValue[i] : constant.UNDEFINED,
-        oldValue ? oldValue[i] : constant.UNDEFINED
+        // 把 number 转成 string
+        constant.EMPTY_STRING + i,
+        newIsArray ? newValue[i] : constant.UNDEFINED,
+        oldIsArray ? oldValue[i] : constant.UNDEFINED
       )
     }
 

@@ -1,6 +1,7 @@
 import * as is from 'yox-common/src/util/is'
-import * as object from 'yox-common/src/util/object'
 import * as constant from 'yox-common/src/util/constant'
+
+import createPureObject from 'yox-common/src/function/createPureObject'
 
 /**
  * 对比新旧对象
@@ -21,29 +22,28 @@ export default function (
 
   if (newIsObject || oldIsObject) {
 
-    newValue = newIsObject ? newValue : constant.EMPTY_OBJECT
-    oldValue = oldIsObject ? oldValue : constant.EMPTY_OBJECT
+    const diffed = createPureObject(),
+    newObject = newIsObject ? newValue : constant.EMPTY_OBJECT,
+    oldObject = oldIsObject ? oldValue : constant.EMPTY_OBJECT
 
     if (newIsObject) {
-      object.each(
-        newValue,
-        function (value: any, key: string) {
-          if (value !== oldValue[key]) {
-            callback(key, value, oldValue[key])
-          }
+      for (const key in newObject) {
+        const value = newObject[key]
+        if (value !== oldObject[key]) {
+          // 保证遍历 oldObject 时不会再次触发
+          diffed.set(key, constant.TRUE)
+          callback(key, value, oldObject[key])
         }
-      )
+      }
     }
 
     if (oldIsObject) {
-      object.each(
-        oldValue,
-        function (value: any, key: string) {
-          if (value !== newValue[key]) {
-            callback(key, newValue[key], value)
-          }
+      for (const key in oldObject) {
+        const value = oldObject[key]
+        if (diffed.get(key) === constant.UNDEFINED && value !== newObject[key]) {
+          callback(key, newObject[key], value)
         }
-      )
+      }
     }
 
   }

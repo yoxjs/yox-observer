@@ -12,7 +12,7 @@ import * as constant from 'yox-common/src/util/constant'
 
 // 避免频繁创建对象
 const optionsHolder: WatcherOptions = {
-  watcher: constant.EMPTY_FUNCTION
+  watcher: constant.EMPTY_FUNCTION,
 }
 
 /**
@@ -20,7 +20,10 @@ const optionsHolder: WatcherOptions = {
  *
  * @param options
  */
-export default function (options: Watcher | WatcherOptions | void, immediate: boolean | void): WatcherOptions | void {
+export default function (
+  options: Watcher | WatcherOptions | void, 
+  immediate: boolean | void
+): WatcherOptions | void {
 
   if (is.func(options)) {
     optionsHolder.watcher = options as Watcher

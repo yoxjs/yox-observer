@@ -2,7 +2,7 @@ import * as is from 'yox-common/src/util/is'
 import * as constant from 'yox-common/src/util/constant'
 
 /**
- * 对比新旧数组
+ * 对比新旧字符串
  *
  * @param newValue
  * @param oldValue
