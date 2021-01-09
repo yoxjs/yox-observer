@@ -143,7 +143,7 @@ export default class Observer {
 
     { data, computed } = instance,
 
-    setValue = function (newValue: any, keypath: string) {
+    setValue = function (keypath: string, newValue: any) {
 
       const oldValue = instance.get(keypath)
       if (newValue === oldValue) {
@@ -194,10 +194,12 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      setValue(value, keypath as string)
+      setValue(keypath as string, value)
     }
     else if (is.object(keypath)) {
-      object.each(keypath as Data, setValue)
+      for (let key in keypath as Data) {
+        setValue(key, (keypath as Data)[key])
+      }
     }
 
   }
@@ -553,7 +555,7 @@ export default class Observer {
   insert(keypath: string, item: any, index: number | boolean): true | void {
 
     let list = this.get(keypath)
-    list = !is.array(list) ? [] : object.copy(list)
+    list = is.array(list) ? list.slice() : []
 
     const { length } = list
     if (index === constant.TRUE || index === length) {
@@ -607,7 +609,7 @@ export default class Observer {
       && index >= 0
       && index < list.length
     ) {
-      list = object.copy(list)
+      list = list.slice()
       list.splice(index, 1)
       this.set(keypath, list)
       return constant.TRUE
@@ -623,7 +625,7 @@ export default class Observer {
   remove(keypath: string, item: any): true | void {
     let list = this.get(keypath)
     if (is.array(list)) {
-      list = object.copy(list)
+      list = list.slice()
       if (array.remove(list, item)) {
         this.set(keypath, list)
         return constant.TRUE
