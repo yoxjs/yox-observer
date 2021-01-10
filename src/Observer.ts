@@ -40,6 +40,10 @@ interface AsyncChange {
 
 }
 
+// 触发监听函数的参数列表
+// 复用同一个数组，应该能稍微快些
+const watchArgs = new Array(3)
+
 /**
  * 观察者有两种观察模式：
  *
@@ -231,16 +235,20 @@ export default class Observer {
     diffWatcher(
       keypath, newValue, oldValue,
       syncEmitter.listeners, isRecursive,
-      function (watchKeypath: string, keypath: string, newValue: any, oldValue: any) {
+      function (watchKeypath, keypath, newValue, oldValue) {
+
+        watchArgs[0] = newValue
+        watchArgs[1] = oldValue
+        watchArgs[2] = keypath
+
         syncEmitter.fire(
           {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
           }, 
-          [
-            newValue, oldValue, keypath
-          ]
+          watchArgs
         )
+
       }
     )
 
@@ -259,14 +267,12 @@ export default class Observer {
     diffWatcher(
       keypath, newValue, oldValue,
       asyncEmitter.listeners, isRecursive,
-      function (watchKeypath: string, keypath: string, newValue: any, oldValue: any) {
+      function (watchKeypath, keypath, newValue, oldValue) {
 
-        array.each(
-          asyncEmitter.listeners[watchKeypath],
-          function (item) {
-            (item.count as number)++
-          }
-        )
+        const options = asyncEmitter.listeners[watchKeypath]
+        for (let i = 0, length = options.length; i < length; i++) {
+          (options[i].count as number)++
+        }
 
         const { keypaths } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, keypaths: {} })
         keypaths[watchKeypath] = constant.TRUE
@@ -276,12 +282,12 @@ export default class Observer {
           instance.nextTask.append(
             function () {
               if (instance.pending) {
-                instance.pending = constant.UNDEFINED
                 instance.diffAsync()
               }
             }
           )
         }
+
       }
     )
 
@@ -294,30 +300,29 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, asyncChanges } = instance,
+    { asyncEmitter, asyncChanges } = instance
 
-    args = new Array(3)
-
+    instance.pending = constant.UNDEFINED
     instance.asyncChanges = {}
 
-    for (const keypath in asyncChanges) {
+    for (let keypath in asyncChanges) {
 
       const { value, keypaths } = asyncChanges[keypath]
 
-      args[0] = instance.get(keypath)
-      args[1] = value
-      args[2] = keypath
+      watchArgs[0] = instance.get(keypath)
+      watchArgs[1] = value
+      watchArgs[2] = keypath
 
       // 不能在这判断新旧值是否相同，相同就不 fire
       // 因为前面标记了 count，在这中断会导致 count 无法清除
 
-      for (const watchKeypath in keypaths) {
+      for (let watchKeypath in keypaths) {
         asyncEmitter.fire(
           {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
           }, 
-          args,
+          watchArgs,
           filterWatcher
         )
       }
@@ -467,7 +472,7 @@ export default class Observer {
       )
     }
     else {
-      for (const key in keypath as Data) {
+      for (let key in keypath as Data) {
         bind(
           key, 
           formatWatcherOptions(keypath[key]) as WatcherOptions

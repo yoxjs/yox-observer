@@ -27,7 +27,7 @@ export default function (
     oldObject = oldIsObject ? oldValue : constant.EMPTY_OBJECT
 
     if (newIsObject) {
-      for (const key in newObject) {
+      for (let key in newObject) {
         const value = newObject[key]
         if (value !== oldObject[key]) {
           // 保证遍历 oldObject 时不会再次触发
@@ -38,7 +38,7 @@ export default function (
     }
 
     if (oldIsObject) {
-      for (const key in oldObject) {
+      for (let key in oldObject) {
         const value = oldObject[key]
         if (diffed.get(key) === constant.UNDEFINED && value !== newObject[key]) {
           callback(key, newObject[key], value)
