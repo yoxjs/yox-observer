@@ -36,7 +36,7 @@ interface AsyncChange {
   value: any
 
   // 监听的 keypath
-  keypaths: string[]
+  keypaths: Record<string, boolean>
 
 }
 
@@ -268,10 +268,8 @@ export default class Observer {
           }
         )
 
-        const { keypaths } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, keypaths: [] })
-        if (!array.has(keypaths, watchKeypath)) {
-          array.push(keypaths, watchKeypath)
-        }
+        const { keypaths } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, keypaths: {} })
+        keypaths[watchKeypath] = constant.TRUE
 
         if (!instance.pending) {
           instance.pending = constant.TRUE
@@ -296,35 +294,35 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, asyncChanges } = instance
+    { asyncEmitter, asyncChanges } = instance,
+
+    args = new Array(3)
 
     instance.asyncChanges = {}
 
-    object.each(
-      asyncChanges,
-      function (change: AsyncChange, keypath: string) {
+    for (const keypath in asyncChanges) {
 
-        const args = [instance.get(keypath), change.value, keypath]
+      const { value, keypaths } = asyncChanges[keypath]
 
-        // 不能在这判断新旧值是否相同，相同就不 fire
-        // 因为前面标记了 count，在这中断会导致 count 无法清除
+      args[0] = instance.get(keypath)
+      args[1] = value
+      args[2] = keypath
 
-        array.each(
-          change.keypaths,
-          function (watchKeypath) {
-            asyncEmitter.fire(
-              {
-                type: watchKeypath,
-                ns: constant.EMPTY_STRING,
-              }, 
-              args,
-              filterWatcher
-            )
-          }
+      // 不能在这判断新旧值是否相同，相同就不 fire
+      // 因为前面标记了 count，在这中断会导致 count 无法清除
+
+      for (const watchKeypath in keypaths) {
+        asyncEmitter.fire(
+          {
+            type: watchKeypath,
+            ns: constant.EMPTY_STRING,
+          }, 
+          args,
+          filterWatcher
         )
-
       }
-    )
+      
+    }
 
   }
 
@@ -467,15 +465,15 @@ export default class Observer {
         keypath as string,
         formatWatcherOptions(watcher, immediate) as WatcherOptions
       )
-      return
     }
-
-    object.each(
-      keypath as Data,
-      function (options: Watcher | WatcherOptions, keypath: string) {
-        bind(keypath, formatWatcherOptions(options) as WatcherOptions)
+    else {
+      for (const key in keypath as Data) {
+        bind(
+          key, 
+          formatWatcherOptions(keypath[key]) as WatcherOptions
+        )
       }
-    )
+    }
 
   }
 
@@ -555,6 +553,7 @@ export default class Observer {
   insert(keypath: string, item: any, index: number | boolean): true | void {
 
     let list = this.get(keypath)
+
     list = is.array(list) ? list.slice() : []
 
     const { length } = list
