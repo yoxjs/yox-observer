@@ -245,7 +245,7 @@ export default class Observer {
           {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
-          }, 
+          },
           watchArgs
         )
 
@@ -321,12 +321,12 @@ export default class Observer {
           {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
-          }, 
+          },
           watchArgs,
           filterWatcher
         )
       }
-      
+
     }
 
   }
@@ -345,7 +345,7 @@ export default class Observer {
     let instance = this,
 
     context = instance.context,
-    
+
     cache = constant.TRUE,
 
     sync = constant.TRUE,
@@ -474,7 +474,7 @@ export default class Observer {
     else {
       for (let key in keypath as Data) {
         bind(
-          key, 
+          key,
           formatWatcherOptions(keypath[key]) as WatcherOptions
         )
       }

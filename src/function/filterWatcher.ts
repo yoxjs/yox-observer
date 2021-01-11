@@ -10,8 +10,8 @@ import {
  * @param options
  */
 export default function (
-  _: any, 
-  args: any[] | void, 
+  _: any,
+  args: any[] | void,
   options: EmitterOptions
 ): boolean | void {
 

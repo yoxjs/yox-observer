@@ -73,14 +73,14 @@ export default class Computed {
       watcher: instance.watcher = function ($0: any, $1: any, $2: string) {
 
         // 计算属性的依赖变了会走进这里
-  
+
         const oldValue = instance.value,
         newValue = instance.get(constant.TRUE)
-  
+
         if (newValue !== oldValue) {
           observer.diff(keypath, newValue, oldValue)
         }
-  
+
       }
     }
 

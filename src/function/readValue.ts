@@ -2,7 +2,7 @@ import * as object from 'yox-common/src/util/object'
 import * as constant from 'yox-common/src/util/constant'
 
 export default function (
-  source: any, 
+  source: any,
   keypath: string
 ): any {
 

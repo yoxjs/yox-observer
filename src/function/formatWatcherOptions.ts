@@ -21,22 +21,26 @@ const optionsHolder: WatcherOptions = {
  * @param options
  */
 export default function (
-  options: Watcher | WatcherOptions | void, 
+  options: Watcher | WatcherOptions | void,
   immediate: boolean | void
 ): WatcherOptions | void {
 
-  if (is.func(options)) {
+  const isWatcher = is.func(options)
+
+  if (process.env.NODE_ENV === 'development') {
+    if (!options
+      || (!isWatcher && !(options as WatcherOptions).watcher)
+    ) {
+      logger.fatal(`watcher should be a Function or WatcherOptions.`)
+    }
+  }
+
+  if (isWatcher) {
     optionsHolder.watcher = options as Watcher
     optionsHolder.immediate = immediate === constant.TRUE
     return optionsHolder
   }
 
-  if (options && (options as WatcherOptions).watcher) {
-    return options as WatcherOptions
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    logger.fatal(`watcher should be a function or object.`)
-  }
+  return options as WatcherOptions
 
 }
