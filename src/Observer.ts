@@ -30,16 +30,6 @@ import diffWatcher from './function/diffWatcher'
 import filterWatcher from './function/filterWatcher'
 import formatWatcherOptions from './function/formatWatcherOptions'
 
-interface AsyncChange {
-
-  // 旧值
-  value: any
-
-  // 监听的 keypath
-  keypaths: Record<string, boolean>
-
-}
-
 // 触发监听函数的参数列表
 // 复用同一个数组，应该能稍微快些
 const watchArgs = new Array(3)
@@ -69,7 +59,9 @@ export default class Observer {
 
   asyncEmitter: Emitter
 
-  asyncChanges: Record<string, AsyncChange>
+  asyncOldValues: Record<string, any>
+
+  asyncKeypaths: Record<string, Record<string, boolean>>
 
   pending?: boolean
 
@@ -83,7 +75,9 @@ export default class Observer {
 
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
-    instance.asyncChanges = {}
+
+    instance.asyncOldValues = {}
+    instance.asyncKeypaths = {}
 
   }
 
@@ -221,9 +215,9 @@ export default class Observer {
     oldValue: any
   ) {
 
-    const instance = this,
+    let instance = this,
 
-    { syncEmitter, asyncEmitter, asyncChanges } = instance,
+    { syncEmitter, asyncEmitter, asyncOldValues, asyncKeypaths } = instance,
 
     /**
      * 我们认为 $ 开头的变量是不可递归的
@@ -274,8 +268,12 @@ export default class Observer {
           (options[i].count as number)++
         }
 
-        const { keypaths } = asyncChanges[keypath] || (asyncChanges[keypath] = { value: oldValue, keypaths: {} })
-        keypaths[watchKeypath] = constant.TRUE
+        if (!asyncKeypaths[keypath]) {
+          asyncOldValues[keypath] = oldValue
+          asyncKeypaths[keypath] = {}
+        }
+
+        asyncKeypaths[keypath][watchKeypath] = constant.TRUE
 
         if (!instance.pending) {
           instance.pending = constant.TRUE
@@ -300,21 +298,22 @@ export default class Observer {
 
     const instance = this,
 
-    { asyncEmitter, asyncChanges } = instance
+    { asyncEmitter, asyncOldValues, asyncKeypaths } = instance
 
     instance.pending = constant.UNDEFINED
-    instance.asyncChanges = {}
+    instance.asyncOldValues = {}
+    instance.asyncKeypaths = {}
 
-    for (let keypath in asyncChanges) {
-
-      const { value, keypaths } = asyncChanges[keypath]
+    for (let keypath in asyncOldValues) {
 
       watchArgs[0] = instance.get(keypath)
-      watchArgs[1] = value
+      watchArgs[1] = asyncOldValues[keypath]
       watchArgs[2] = keypath
 
       // 不能在这判断新旧值是否相同，相同就不 fire
       // 因为前面标记了 count，在这中断会导致 count 无法清除
+
+      const keypaths = asyncKeypaths[keypath]
 
       for (let watchKeypath in keypaths) {
         asyncEmitter.fire(
