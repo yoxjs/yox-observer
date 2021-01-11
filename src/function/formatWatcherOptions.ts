@@ -23,7 +23,7 @@ const optionsHolder: WatcherOptions = {
 export default function (
   options: Watcher | WatcherOptions | void,
   immediate: boolean | void
-): WatcherOptions | void {
+): WatcherOptions {
 
   const isWatcher = is.func(options)
 

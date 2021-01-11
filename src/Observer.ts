@@ -433,7 +433,7 @@ export default class Observer {
 
     { context, syncEmitter, asyncEmitter } = instance,
 
-    bind = function (keypath: string, options: WatcherOptions) {
+    addWatcher = function (keypath: string, options: WatcherOptions) {
 
       const emitter = options.sync ? syncEmitter : asyncEmitter,
 
@@ -466,16 +466,16 @@ export default class Observer {
     }
 
     if (is.string(keypath)) {
-      bind(
+      addWatcher(
         keypath as string,
-        formatWatcherOptions(watcher, immediate) as WatcherOptions
+        formatWatcherOptions(watcher, immediate)
       )
     }
     else {
-      for (let key in keypath as Data) {
-        bind(
+      for (let key in keypath as Record<string, Watcher | WatcherOptions>) {
+        addWatcher(
           key,
-          formatWatcherOptions(keypath[key]) as WatcherOptions
+          formatWatcherOptions(keypath[key])
         )
       }
     }
