@@ -27,7 +27,6 @@ import * as keypathUtil from 'yox-common/src/util/keypath'
 
 import Computed from './Computed'
 import diffWatcher from './function/diffWatcher'
-import filterWatcher from './function/filterWatcher'
 import formatWatcherOptions from './function/formatWatcherOptions'
 
 // 触发监听函数的参数列表
@@ -263,6 +262,7 @@ export default class Observer {
       asyncEmitter.listeners, isRecursive,
       function (watchKeypath, keypath, newValue, oldValue) {
 
+        // 这里是为了解决上面说的坑
         const options = asyncEmitter.listeners[watchKeypath]
         for (let i = 0, length = options.length; i < length; i++) {
           (options[i].count as number)++
@@ -310,10 +310,32 @@ export default class Observer {
       watchArgs[1] = asyncOldValues[keypath]
       watchArgs[2] = keypath
 
-      // 不能在这判断新旧值是否相同，相同就不 fire
-      // 因为前面标记了 count，在这中断会导致 count 无法清除
+      const keypaths = asyncKeypaths[keypath],
 
-      const keypaths = asyncKeypaths[keypath]
+      hasChange = watchArgs[0] !== watchArgs[1],
+
+      filterWatcher = function (
+        event: any,
+        args: any,
+        options: EmitterOptions
+      ): boolean | void {
+
+        // 前面递增了 count
+        // 这里要递减 count
+        // count > 0 表示前面标记了该监听器需要响应此次变化
+        if (options.count) {
+
+          // 采用计数器的原因是，同一个 options 可能执行多次
+          // 比如监听 user.*，如果同批次修改了 user.name 和 user.age
+          // 这个监听器会调用多次，如果第一次执行就把 count 干掉了，第二次就无法执行了
+          options.count--
+
+          // 新旧值不相等才能触发监听器
+          return hasChange
+
+        }
+
+      }
 
       for (let watchKeypath in keypaths) {
         asyncEmitter.fire(
