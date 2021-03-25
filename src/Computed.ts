@@ -115,7 +115,7 @@ export default class Computed {
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
-    else if (force || !object.has(instance, constant.RAW_VALUE)) {
+    else if (force || !object.has(instance, 'value')) {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.fixed) {

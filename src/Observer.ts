@@ -31,7 +31,9 @@ import formatWatcherOptions from './function/formatWatcherOptions'
 
 // 触发监听函数的参数列表
 // 复用同一个数组，应该能稍微快些
-const watchArgs = new Array(3)
+const syncWatchArgs = new Array(3),
+
+asyncWatchArgs = new Array(3)
 
 /**
  * 观察者有两种观察模式：
@@ -230,16 +232,16 @@ export default class Observer {
       syncEmitter.listeners, isRecursive,
       function (watchKeypath, keypath, newValue, oldValue) {
 
-        watchArgs[0] = newValue
-        watchArgs[1] = oldValue
-        watchArgs[2] = keypath
+        syncWatchArgs[0] = newValue
+        syncWatchArgs[1] = oldValue
+        syncWatchArgs[2] = keypath
 
         syncEmitter.fire(
           {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
           },
-          watchArgs
+          syncWatchArgs
         )
 
       }
@@ -306,13 +308,13 @@ export default class Observer {
 
     for (let keypath in asyncOldValues) {
 
-      watchArgs[0] = instance.get(keypath)
-      watchArgs[1] = asyncOldValues[keypath]
-      watchArgs[2] = keypath
+      asyncWatchArgs[0] = instance.get(keypath)
+      asyncWatchArgs[1] = asyncOldValues[keypath]
+      asyncWatchArgs[2] = keypath
 
       const keypaths = asyncKeypaths[keypath],
 
-      hasChange = watchArgs[0] !== watchArgs[1],
+      hasChange = asyncWatchArgs[0] !== asyncWatchArgs[1],
 
       filterWatcher = function (
         event: any,
@@ -343,7 +345,7 @@ export default class Observer {
             type: watchKeypath,
             ns: constant.EMPTY_STRING,
           },
-          watchArgs,
+          asyncWatchArgs,
           filterWatcher
         )
       }
@@ -513,7 +515,7 @@ export default class Observer {
     keypath?: string,
     watcher?: Watcher
   ) {
-    let filter: EmitterFilter = {
+    const filter: EmitterFilter = {
       ns: constant.EMPTY_STRING,
       listener: watcher,
     }
