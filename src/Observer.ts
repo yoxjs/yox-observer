@@ -60,19 +60,19 @@ export default class Observer {
 
   pending?: boolean
 
-  constructor(data?: Data, context?: any) {
+  constructor(data?: Data, context?: any, nextTask?: NextTask) {
 
     const instance = this
 
-    instance.data = data || {}
+    instance.data = data || { }
     instance.context = context || instance
-    instance.nextTask = new NextTask()
+    instance.nextTask = nextTask || new NextTask()
 
     instance.syncEmitter = new Emitter()
     instance.asyncEmitter = new Emitter()
 
-    instance.asyncOldValues = {}
-    instance.asyncKeypaths = {}
+    instance.asyncOldValues = { }
+    instance.asyncKeypaths = { }
 
   }
 
@@ -164,7 +164,7 @@ export default class Observer {
                 data[key] = newValue
               }
               else {
-                next = data[key] || (data[key] = {})
+                next = data[key] || (data[key] = { })
               }
             }
             return
@@ -175,7 +175,7 @@ export default class Observer {
               next[key] = newValue
             }
             else {
-              next = next[key] || (next[key] = {})
+              next = next[key] || (next[key] = { })
             }
           }
 
@@ -266,7 +266,7 @@ export default class Observer {
 
         if (!asyncKeypaths[keypath]) {
           asyncOldValues[keypath] = oldValue
-          asyncKeypaths[keypath] = {}
+          asyncKeypaths[keypath] = { }
         }
 
         asyncKeypaths[keypath][watchKeypath] = constant.TRUE
@@ -290,15 +290,15 @@ export default class Observer {
   /**
    * 异步触发的 diff
    */
-  diffAsync() {
+  private diffAsync() {
 
     const instance = this,
 
     { asyncEmitter, asyncOldValues, asyncKeypaths } = instance
 
     instance.pending = constant.UNDEFINED
-    instance.asyncOldValues = {}
-    instance.asyncKeypaths = {}
+    instance.asyncOldValues = { }
+    instance.asyncKeypaths = { }
 
     for (let keypath in asyncOldValues) {
 
@@ -405,7 +405,7 @@ export default class Observer {
       const computed = new Computed(keypath, sync, cache, deps, instance, getter, setter)
 
       if (!instance.computed) {
-        instance.computed = {}
+        instance.computed = { }
       }
 
       instance.computed[keypath] = computed
