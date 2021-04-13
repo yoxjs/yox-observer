@@ -20,7 +20,6 @@ import * as string from 'yox-common/src/util/string'
 import * as constant from 'yox-common/src/util/constant'
 
 import toNumber from 'yox-common/src/function/toNumber'
-import execute from 'yox-common/src/function/execute'
 import Emitter from 'yox-common/src/util/Emitter'
 import NextTask from 'yox-common/src/util/NextTask'
 import * as keypathUtil from 'yox-common/src/util/keypath'
@@ -471,14 +470,11 @@ export default class Observer {
       emitter.on(keypath, listener)
 
       if (options.immediate) {
-        execute(
-          options.watcher,
+        options.watcher.call(
           context,
-          [
-            instance.get(keypath),
-            constant.UNDEFINED,
-            keypath
-          ]
+          instance.get(keypath),
+          constant.UNDEFINED,
+          keypath
         )
       }
 
