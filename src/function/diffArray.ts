@@ -25,7 +25,7 @@ export default function (
     oldLength = oldIsArray ? oldValue.length : constant.UNDEFINED
 
     callback(
-      'length',
+      constant.RAW_LENGTH,
       newLength,
       oldLength
     )

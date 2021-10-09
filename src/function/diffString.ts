@@ -20,7 +20,7 @@ export default function (
 
   if (newIsString || oldIsString) {
     callback(
-      'length',
+      constant.RAW_LENGTH,
       newIsString ? newValue.length : constant.UNDEFINED,
       oldIsString ? oldValue.length : constant.UNDEFINED
     )
