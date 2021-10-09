@@ -670,6 +670,7 @@ export default class Observer {
     instance.syncEmitter.off()
     instance.asyncEmitter.off()
     instance.nextTask.clear()
+    instance.data = { }
   }
 
 }
