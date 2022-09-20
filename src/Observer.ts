@@ -28,6 +28,8 @@ import Computed from './Computed'
 import diffWatcher from './function/diffWatcher'
 import formatWatcherOptions from './function/formatWatcherOptions'
 
+let guid = 0
+
 /**
  * 观察者有两种观察模式：
  *
@@ -40,6 +42,8 @@ import formatWatcherOptions from './function/formatWatcherOptions'
  * 对于外部调用 observer.watch('keypath', listener)，属于异步监听，它只关心是否变了，而不关心是否是立即触发的
  */
 export default class Observer {
+
+  id: number
 
   data: Data
 
@@ -63,6 +67,7 @@ export default class Observer {
 
     const instance = this
 
+    instance.id = guid++
     instance.data = data || { }
     instance.context = context || instance
     instance.nextTask = nextTask || new NextTask()
@@ -103,7 +108,7 @@ export default class Observer {
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
     if (currentComputed && !depIgnore) {
-      currentComputed.add(keypath)
+      currentComputed.addDep(instance, keypath)
     }
 
     let result: ValueHolder | void
@@ -401,7 +406,7 @@ export default class Observer {
 
     if (getter) {
 
-      const computed = new Computed(keypath, sync, cache, deps, instance, getter, setter)
+      const computed = new Computed(instance, keypath, sync, cache, deps, getter, setter)
 
       if (!instance.computed) {
         instance.computed = { }

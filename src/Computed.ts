@@ -30,9 +30,7 @@ export default class Computed {
 
   staticDeps: string[] | void
 
-  dynamicDeps: Record<string, true> | void
-
-  observer: Observer
+  dynamicDeps: Record<number, Record<string, Observer>> | void
 
   getter: ComputedGetter
 
@@ -43,11 +41,11 @@ export default class Computed {
   watcherOptions: WatcherOptions
 
   constructor(
+    observer: Observer,
     keypath: string,
     sync: boolean,
     cache: boolean,
     deps: string[] | void,
-    observer: Observer,
     getter: ComputedGetter,
     setter: ComputedSetter | void
   ) {
@@ -57,7 +55,6 @@ export default class Computed {
     instance.keypath = keypath
     instance.cache = cache
 
-    instance.observer = observer
     instance.getter = getter
     instance.setter = setter
 
@@ -100,7 +97,7 @@ export default class Computed {
 
     const instance = this,
 
-    { getter, dynamicDeps, observer, watcher } = instance
+    { getter, dynamicDeps, watcher } = instance
 
     // 禁用缓存
     if (!instance.cache) {
@@ -119,8 +116,11 @@ export default class Computed {
 
         // 清空上次收集的依赖
         if (dynamicDeps) {
-          for (let key in dynamicDeps) {
-            observer.unwatch(key, watcher)
+          for (let id in dynamicDeps) {
+            const deps = dynamicDeps[id]
+            for (let keypath in deps) {
+              deps[keypath].unwatch(keypath, watcher)
+            }
           }
         }
 
@@ -152,18 +152,17 @@ export default class Computed {
   /**
    * 添加依赖
    *
-   * 这里只是为了保证依赖唯一
-   *
    * @param dep
    */
-  add(dep: string) {
-    const { dynamicDeps, observer, watcherOptions } = this
-    if (!dynamicDeps[dep]) {
+  addDep(observer: Observer, dep: string) {
+    const { dynamicDeps, watcherOptions } = this,
+    deps = dynamicDeps[observer.id] || (dynamicDeps[observer.id] = { })
+    if (!deps[dep]) {
       observer.watch(
         dep,
         watcherOptions
       )
-      dynamicDeps[dep] = constant.TRUE
+      deps[dep] = observer
     }
   }
 
