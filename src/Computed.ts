@@ -1,5 +1,4 @@
 import {
-  PureObject,
   Watcher,
   ComputedGetter,
   ComputedSetter,
@@ -42,8 +41,6 @@ export default class Computed {
   watcher: Watcher
 
   watcherOptions: WatcherOptions
-
-  unique: PureObject | void
 
   constructor(
     keypath: string,
