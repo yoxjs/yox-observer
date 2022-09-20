@@ -11,8 +11,6 @@ import {
 
 import Observer from './Observer'
 
-import createPureObject from 'yox-common/src/function/createPureObject'
-
 import * as object from 'yox-common/src/util/object'
 import * as constant from 'yox-common/src/util/constant'
 
@@ -29,11 +27,11 @@ export default class Computed {
 
   value: any
 
-  deps: string[] | void
-
   cache: boolean
 
-  fixed: boolean
+  staticDeps: string[] | void
+
+  dynamicDeps: Record<string, true> | void
 
   observer: Observer
 
@@ -62,8 +60,6 @@ export default class Computed {
     instance.keypath = keypath
     instance.cache = cache
 
-    instance.deps = deps
-
     instance.observer = observer
     instance.getter = getter
     instance.setter = setter
@@ -87,7 +83,7 @@ export default class Computed {
     // 如果 deps 是空数组，Observer 会传入 undefined
     // 因此这里直接判断即可
     if (deps) {
-      instance.fixed = constant.TRUE
+      instance.staticDeps = deps
       for (let i = 0, length = deps.length; i < length; i++) {
         observer.watch(
           deps[i],
@@ -107,7 +103,7 @@ export default class Computed {
 
     const instance = this,
 
-    { getter, deps, observer, watcher, watcherOptions } = instance
+    { getter, dynamicDeps, observer, watcher } = instance
 
     // 禁用缓存
     if (!instance.cache) {
@@ -118,40 +114,27 @@ export default class Computed {
     else if (force || !object.has(instance, 'value')) {
 
       // 如果写死了依赖，则不需要收集依赖
-      if (instance.fixed) {
+      if (instance.staticDeps) {
         instance.value = getter()
       }
       // 自动收集依赖
       else {
 
         // 清空上次收集的依赖
-        if (deps) {
-          for (let i = deps.length - 1; i >= 0; i--) {
-            observer.unwatch(deps[i], watcher)
+        if (dynamicDeps) {
+          for (let key in dynamicDeps) {
+            observer.unwatch(key, watcher)
           }
         }
 
         // 惰性初始化
-        instance.unique = createPureObject()
+        instance.dynamicDeps = { }
+
+        const lastComputed = Computed.current
 
         // 开始收集新的依赖
-        const lastComputed = Computed.current
         Computed.current = instance
-
         instance.value = getter()
-
-        // 绑定新的依赖
-        const newDeps = (instance.unique as PureObject).keys()
-
-        for (let i = 0, length = newDeps.length; i < length; i++) {
-          observer.watch(
-            newDeps[i],
-            watcherOptions
-          )
-        }
-
-        instance.deps = newDeps
-
         // 取值完成，恢复原值
         Computed.current = lastComputed
 
@@ -177,7 +160,14 @@ export default class Computed {
    * @param dep
    */
   add(dep: string) {
-    (this.unique as PureObject).set(dep, constant.TRUE)
+    const { dynamicDeps, observer, watcherOptions } = this
+    if (!dynamicDeps[dep]) {
+      observer.watch(
+        dep,
+        watcherOptions
+      )
+      dynamicDeps[dep] = constant.TRUE
+    }
   }
 
 }

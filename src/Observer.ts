@@ -353,7 +353,7 @@ export default class Observer {
    * 添加计算属性
    *
    * @param keypath
-   * @param computed
+   * @param options
    */
   addComputed(
     keypath: string,
