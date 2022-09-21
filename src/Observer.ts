@@ -375,6 +375,8 @@ export default class Observer {
 
     deps: string[] | void,
 
+    args: any[] | void,
+
     getter: ComputedGetter | void,
 
     setter: ComputedSetter | void
@@ -396,6 +398,10 @@ export default class Observer {
       if (!array.falsy(computedOptions.deps)) {
         deps = computedOptions.deps as string[]
       }
+      // 参数列表必须是长度大于 0 的数组
+      if (!array.falsy(computedOptions.args)) {
+        args = computedOptions.args as any[]
+      }
       if (is.func(computedOptions.get)) {
         getter = computedOptions.get.bind(context)
       }
@@ -406,7 +412,7 @@ export default class Observer {
 
     if (getter) {
 
-      const computed = new Computed(instance, keypath, sync, cache, deps, getter, setter)
+      const computed = new Computed(instance, keypath, sync, cache, deps, args, getter, setter)
 
       if (!instance.computed) {
         instance.computed = { }

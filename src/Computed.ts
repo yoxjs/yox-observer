@@ -11,7 +11,6 @@ import {
 import Observer from './Observer'
 
 import * as object from 'yox-common/src/util/object'
-import * as constant from 'yox-common/src/util/constant'
 
 /**
  * 计算属性
@@ -32,9 +31,11 @@ export default class Computed {
 
   dynamicDeps: Record<number, Record<string, Observer>> | void
 
+  setter: ComputedSetter | void
+
   getter: ComputedGetter
 
-  setter: ComputedSetter | void
+  execute: () => any
 
   watcher: Watcher
 
@@ -46,6 +47,7 @@ export default class Computed {
     sync: boolean,
     cache: boolean,
     deps: string[] | void,
+    args: any[] | void,
     getter: ComputedGetter,
     setter: ComputedSetter | void
   ) {
@@ -55,8 +57,14 @@ export default class Computed {
     instance.keypath = keypath
     instance.cache = cache
 
-    instance.getter = getter
     instance.setter = setter
+    instance.getter = getter
+
+    instance.execute = args
+      ? function () {
+          return getter.apply(this, args)
+        }
+      : getter
 
     instance.watcherOptions = {
       sync,
@@ -64,8 +72,12 @@ export default class Computed {
 
         // 计算属性的依赖变了会走进这里
 
-        const oldValue = instance.value,
-        newValue = instance.get(constant.TRUE)
+        const oldValue = instance.value
+
+        // 清除缓存
+        delete instance.value
+
+        const newValue = instance.get()
 
         if (newValue !== oldValue) {
           observer.diff(keypath, newValue, oldValue)
@@ -90,26 +102,24 @@ export default class Computed {
 
   /**
    * 读取计算属性的值
-   *
-   * @param force 是否强制刷新缓存
    */
-  get(force?: boolean): any {
+  get(): any {
 
     const instance = this,
 
-    { getter, dynamicDeps, watcher } = instance
+    { execute, dynamicDeps, watcher } = instance
 
     // 禁用缓存
     if (!instance.cache) {
-      instance.value = getter()
+      instance.value = execute()
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
-    else if (force || !object.has(instance, 'value')) {
+    else if (!object.has(instance, 'value')) {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.staticDeps) {
-        instance.value = getter()
+        instance.value = execute()
       }
       // 自动收集依赖
       else {
@@ -131,7 +141,7 @@ export default class Computed {
 
         // 开始收集新的依赖
         Computed.current = instance
-        instance.value = getter()
+        instance.value = execute()
         // 取值完成，恢复原值
         Computed.current = lastComputed
 
