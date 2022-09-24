@@ -1,7 +1,6 @@
 import {
   Data,
   Watcher,
-  ValueHolder,
   ComputedGetter,
   ComputedSetter,
 } from 'yox-type/src/type'
@@ -51,8 +50,6 @@ export default class Observer {
 
   nextTask: NextTask
 
-  computed?: Record<string, Computed>
-
   syncEmitter: Emitter
 
   asyncEmitter: Emitter
@@ -96,9 +93,9 @@ export default class Observer {
 
     const instance = this,
 
-    currentComputed = Computed.current,
+    { data } = instance,
 
-    { data, computed } = instance
+    currentComputed = Computed.current
 
     // 传入 '' 获取整个 data
     if (keypath === constant.EMPTY_STRING) {
@@ -111,15 +108,7 @@ export default class Observer {
       currentComputed.addDep(instance, keypath)
     }
 
-    let result: ValueHolder | void
-
-    if (computed) {
-      result = object.get(computed, keypath)
-    }
-
-    if (!result) {
-      result = object.get(data, keypath)
-    }
+    const result = object.get(data, keypath)
 
     return result ? result.value : defaultValue
 
@@ -138,7 +127,7 @@ export default class Observer {
 
     const instance = this,
 
-    { data, computed } = instance,
+    { data } = instance,
 
     setValue = function (keypath: string, newValue: any) {
 
@@ -154,13 +143,14 @@ export default class Observer {
         function (key, index, lastIndex) {
 
           if (index === 0) {
-            if (computed && computed[key]) {
+            const item = data[key]
+            if (item && item instanceof Computed) {
               if (lastIndex === 0) {
-                computed[key].set(newValue)
+                item.set(newValue)
               }
               else {
                 // 这里 next 可能为空
-                next = computed[key].get()
+                next = item.get()
               }
             }
             else {
@@ -411,17 +401,9 @@ export default class Observer {
     }
 
     if (getter) {
-
-      const computed = new Computed(instance, keypath, sync, cache, deps, args, getter, setter)
-
-      if (!instance.computed) {
-        instance.computed = { }
-      }
-
-      instance.computed[keypath] = computed
-
-      return computed
-
+      return instance.data[keypath] = new Computed(
+        instance, keypath, sync, cache, deps, args, getter, setter
+      )
     }
 
   }
@@ -437,10 +419,10 @@ export default class Observer {
 
     const instance = this,
 
-    { computed } = instance
+    { data } = instance
 
-    if (computed && object.has(computed, keypath)) {
-      delete computed[keypath]
+    if (object.has(data, keypath)) {
+      delete data[keypath]
     }
 
   }
