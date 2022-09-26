@@ -10,16 +10,34 @@ import {
 
 import Observer from './Observer'
 
+import * as is from 'yox-common/src/util/is'
 import * as object from 'yox-common/src/util/object'
+import * as constant from 'yox-common/src/util/constant'
+
+function runGetter(instance: Computed) {
+  const { args, getter } = instance
+  instance.value = args
+    ? getter.apply(constant.UNDEFINED, args)
+    : getter()
+}
+
+function runOutter(instance: Computed) {
+  const { value, outter } = instance
+  return outter
+    ? outter(value)
+    : value
+}
 
 /**
  * 计算属性
  *
- * 可配置 cache、deps、get、set 等
+ * 可配置 cache、deps、args, get、set 等
  */
 export default class Computed {
 
   static current?: Computed
+
+  observer: Observer
 
   keypath: string
 
@@ -27,15 +45,17 @@ export default class Computed {
 
   cache: boolean
 
+  args: any[] | void
+
   staticDeps: string[] | void
 
   dynamicDeps: Record<number, Record<string, Observer>> | void
 
+  outter: ComputedSetter | void
+
   setter: ComputedSetter | void
 
   getter: ComputedGetter
-
-  execute: () => any
 
   watcher: Watcher
 
@@ -49,40 +69,26 @@ export default class Computed {
     deps: string[] | void,
     args: any[] | void,
     getter: ComputedGetter,
-    setter: ComputedSetter | void
+    setter: ComputedSetter | void,
+    outter: ComputedSetter | void
   ) {
 
     const instance = this
 
+    instance.observer = observer
     instance.keypath = keypath
     instance.cache = cache
+    instance.args = args
 
+    instance.outter = outter
     instance.setter = setter
     instance.getter = getter
-
-    instance.execute = args
-      ? function () {
-          return getter.apply(this, args)
-        }
-      : getter
 
     instance.watcherOptions = {
       sync,
       watcher: instance.watcher = function ($0: any, $1: any, $2: string) {
-
         // 计算属性的依赖变了会走进这里
-
-        const oldValue = instance.value
-
-        // 清除缓存
-        delete instance.value
-
-        const newValue = instance.get()
-
-        if (newValue !== oldValue) {
-          observer.diff(keypath, newValue, oldValue)
-        }
-
+        instance.refresh()
       }
     }
 
@@ -107,11 +113,11 @@ export default class Computed {
 
     const instance = this,
 
-    { execute, dynamicDeps, watcher } = instance
+    { dynamicDeps, watcher } = instance
 
     // 禁用缓存
     if (!instance.cache) {
-      instance.value = execute()
+      runGetter(instance)
     }
 
     // 减少取值频率，尤其是处理复杂的计算规则
@@ -119,7 +125,7 @@ export default class Computed {
 
       // 如果写死了依赖，则不需要收集依赖
       if (instance.staticDeps) {
-        instance.value = execute()
+        runGetter(instance)
       }
       // 自动收集依赖
       else {
@@ -141,7 +147,7 @@ export default class Computed {
 
         // 开始收集新的依赖
         Computed.current = instance
-        instance.value = execute()
+        runGetter(instance)
         // 取值完成，恢复原值
         Computed.current = lastComputed
 
@@ -149,7 +155,7 @@ export default class Computed {
 
     }
 
-    return instance.value
+    return runOutter(instance)
   }
 
   set(value: any) {
@@ -157,6 +163,25 @@ export default class Computed {
     if (setter) {
       setter(value)
     }
+    else if (is.func(value)) {
+      this.getter = value
+      this.refresh()
+    }
+  }
+
+  refresh() {
+
+    const { observer, keypath, value } = this
+
+    // 清除缓存
+    delete this.value
+
+    const newValue = this.get()
+
+    if (newValue !== value) {
+      observer.diff(keypath, newValue, value)
+    }
+
   }
 
   /**

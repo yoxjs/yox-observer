@@ -3,6 +3,7 @@ import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
+  ComputedOutter,
 } from 'yox-type/src/type'
 
 import {
@@ -369,7 +370,9 @@ export default class Observer {
 
     getter: ComputedGetter | void,
 
-    setter: ComputedSetter | void
+    setter: ComputedSetter | void,
+
+    outter: ComputedOutter | void
 
     // 这里用 bind 方法转换一下调用的 this
     // 还有一个好处，它比 call(context) 速度稍快一些
@@ -398,11 +401,14 @@ export default class Observer {
       if (is.func(computedOptions.set)) {
         setter = (computedOptions.set as ComputedSetter).bind(context)
       }
+      if (is.func(computedOptions.out)) {
+        outter = (computedOptions.out as ComputedOutter).bind(context)
+      }
     }
 
     if (getter) {
       return instance.data[keypath] = new Computed(
-        instance, keypath, sync, cache, deps, args, getter, setter
+        instance, keypath, sync, cache, deps, args, getter, setter, outter
       )
     }
 
