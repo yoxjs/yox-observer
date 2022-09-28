@@ -3,14 +3,13 @@ import {
   Watcher,
   ComputedGetter,
   ComputedSetter,
-  ComputedOutter,
+  ComputedOutput,
 } from 'yox-type/src/type'
 
 import {
   WatcherOptions,
   ComputedOptions,
   EmitterOptions,
-  EmitterFilter,
 } from 'yox-type/src/options'
 
 import * as is from 'yox-common/src/util/is'
@@ -59,6 +58,8 @@ export default class Observer {
 
   asyncKeypaths: Record<string, Record<string, boolean>>
 
+  onComputedChange: (keypath: string, newValue: any, oldValue: any) => void
+
   pending?: boolean
 
   constructor(data?: Data, context?: any, nextTask?: NextTask) {
@@ -75,6 +76,10 @@ export default class Observer {
 
     instance.asyncOldValues = { }
     instance.asyncKeypaths = { }
+
+    instance.onComputedChange = function (keypath: string, newValue: any, oldValue: any) {
+      instance.diff(keypath, newValue, oldValue)
+    }
 
   }
 
@@ -106,12 +111,14 @@ export default class Observer {
     // 调用 get 时，外面想要获取依赖必须设置是谁在收集依赖
     // 如果没设置，则跳过依赖收集
     if (currentComputed && !depIgnore) {
-      currentComputed.addDep(instance, keypath)
+      currentComputed.addDynamicDep(instance, keypath)
     }
 
     const result = object.get(data, keypath)
 
-    return result ? result.value : defaultValue
+    return result
+      ? result.value
+      : defaultValue
 
   }
 
@@ -366,13 +373,13 @@ export default class Observer {
 
     deps: string[] | void,
 
-    args: any[] | void,
+    input: any[] | void,
 
     getter: ComputedGetter | void,
 
     setter: ComputedSetter | void,
 
-    outter: ComputedOutter | void
+    output: ComputedOutput | void
 
     // 这里用 bind 方法转换一下调用的 this
     // 还有一个好处，它比 call(context) 速度稍快一些
@@ -387,13 +394,15 @@ export default class Observer {
       if (is.boolean(computedOptions.sync)) {
         sync = computedOptions.sync as boolean
       }
-      // 传入空数组等同于没传
-      if (!array.falsy(computedOptions.deps)) {
-        deps = computedOptions.deps as string[]
+      if (is.array(computedOptions.deps)) {
+        deps = computedOptions.deps
       }
       // 参数列表必须是长度大于 0 的数组
-      if (!array.falsy(computedOptions.args)) {
-        args = computedOptions.args as any[]
+      if (!array.falsy(computedOptions.input)) {
+        input = computedOptions.input
+      }
+      if (is.func(computedOptions.output)) {
+        output = computedOptions.output
       }
       if (is.func(computedOptions.get)) {
         getter = computedOptions.get.bind(context)
@@ -401,15 +410,25 @@ export default class Observer {
       if (is.func(computedOptions.set)) {
         setter = (computedOptions.set as ComputedSetter).bind(context)
       }
-      if (is.func(computedOptions.out)) {
-        outter = (computedOptions.out as ComputedOutter).bind(context)
-      }
     }
 
     if (getter) {
-      return instance.data[keypath] = new Computed(
-        instance, keypath, sync, cache, deps, args, getter, setter, outter
+      const computed = new Computed(
+        keypath,
+        cache,
+        sync,
+        input,
+        output,
+        getter,
+        setter,
+        instance.onComputedChange
       )
+
+      if (cache && deps) {
+        computed.addStaticDeps(instance, deps)
+      }
+
+      return instance.data[keypath] = computed
     }
 
   }
@@ -422,15 +441,7 @@ export default class Observer {
   removeComputed(
     keypath: string
   ) {
-
-    const instance = this,
-
-    { data } = instance
-
-    if (object.has(data, keypath)) {
-      delete data[keypath]
-    }
-
+    delete this.data[keypath]
   }
 
   /**
@@ -506,12 +517,8 @@ export default class Observer {
     keypath?: string,
     watcher?: Watcher
   ) {
-    const filter: EmitterFilter = {
-      ns: constant.EMPTY_STRING,
-      listener: watcher,
-    }
-    this.syncEmitter.off(keypath, filter)
-    this.asyncEmitter.off(keypath, filter)
+    this.syncEmitter.off(keypath, watcher)
+    this.asyncEmitter.off(keypath, watcher)
   }
 
   /**
